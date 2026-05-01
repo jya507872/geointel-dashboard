@@ -2,4 +2,6 @@ node_modules/
 .netlify/
 *.log
 .DS_Store
+GeoIntel.app/
+geointel-deploy.zip
 GeoIntel.applescript
