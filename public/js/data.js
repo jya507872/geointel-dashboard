@@ -2,6 +2,7 @@
 // Key: ISO 3166-1 numeric (matches world-atlas TopoJSON IDs)
 // risk: 1 (very safe) → 10 (active war zone)
 // Based on Global Peace Index 2024 + current conflict analysis
+// Last updated: 2026-05-01
 
 const COUNTRY_DATA = {
   "4":   { name:"Afghanistan",         alpha2:"AF", risk:10, region:"South Asia",        tags:["war","terrorism","instability"],           info:"Taliban-controlled state. Active insurgency, extreme poverty, humanitarian crisis, women's rights abolished." },
