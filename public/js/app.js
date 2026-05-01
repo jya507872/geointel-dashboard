@@ -1,0 +1,727 @@
+// ── GEOPOLITICAL INTELLIGENCE DASHBOARD — APP CONTROLLER ───────
+const App = (() => {
+  const NEWS_POLL_MS  = 5  * 60 * 1000;
+  const GDELT_POLL_MS = 10 * 60 * 1000;
+  const TICKER_SPEED  = 55; // px/s
+
+  // When served from Netlify/any non-localhost host, call public APIs directly.
+  // When running locally via `npm start`, use the Express proxy (cached, private).
+  const IS_LOCAL = ['localhost','127.0.0.1',''].includes(window.location.hostname);
+
+  // rss2json.com converts RSS → JSON with CORS support (free, no key needed)
+  const RSS_TO_JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+  const PUBLIC_FEEDS = [
+    { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',                source: 'BBC'        },
+    { url: 'https://www.aljazeera.com/xml/rss/all.xml',                  source: 'Al Jazeera' },
+    { url: 'https://www.theguardian.com/world/rss',                       source: 'Guardian'   },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',     source: 'NYT'        },
+    { url: 'https://foreignpolicy.com/feed/',                             source: 'FP'         },
+  ];
+
+  let tickerAnim    = null;
+  let tickerOffset  = 0;
+  let lastTickerTs  = null;
+  let currentCountry = null;
+  let compareA = null, compareB = null;
+
+  // ── HISTORICAL GPI RISK DATA (approx. per year, selected countries) ──
+  // Format: { iso: [risk2008, risk2009, ..., risk2024] } — 17 values
+  // We interpolate for countries not in list; values shift gradually
+  const GPI_HISTORY = buildGpiHistory();
+
+  // ── REGION VIEWS ─────────────────────────────────────────────
+  const REGIONS = {
+    'world':      { scale: 1,    cx: 0,    cy: 0    },
+    'europe':     { scale: 4.5,  cx: 15,   cy: 54   },
+    'middle-east':{ scale: 5,    cx: 42,   cy: 28   },
+    'africa':     { scale: 3.2,  cx: 20,   cy: 2    },
+    'asia':       { scale: 3,    cx: 100,  cy: 30   },
+    'americas':   { scale: 2.8,  cx: -70,  cy: 10   },
+  };
+
+  // ── INIT ──────────────────────────────────────────────────────
+  function init() {
+    startClock();
+    renderEventCards();
+    renderActiveCount();
+    initSearch();
+    initRegionBar();
+    initTimeline();
+    initTravel();
+    initCompare();
+
+    document.querySelectorAll('.ptab').forEach(btn =>
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab))
+    );
+
+    GeoMap.init(onCountrySelected);
+
+    document.getElementById('map-svg').addEventListener('click', () => {
+      GeoMap.deselectCountry();
+    });
+
+    document.getElementById('cp-compare-btn').addEventListener('click', () => {
+      if (currentCountry) {
+        switchTab('compare');
+        setCompareSlot('a', currentCountry);
+      }
+    });
+
+    fetchNews();
+    fetchGdelt();
+    setInterval(fetchNews,  NEWS_POLL_MS);
+    setInterval(fetchGdelt, GDELT_POLL_MS);
+    setSignal('SIGNAL LIVE', false);
+  }
+
+  // ── CLOCK ─────────────────────────────────────────────────────
+  function startClock() {
+    const DAYS   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    function tick() {
+      const n = new Date();
+      document.getElementById('clock').textContent =
+        `${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}:${pad(n.getUTCSeconds())} UTC`;
+      document.getElementById('date-display').textContent =
+        `${DAYS[n.getUTCDay()]} ${pad(n.getUTCDate())} ${MONTHS[n.getUTCMonth()]} ${n.getUTCFullYear()}`;
+    }
+    tick(); setInterval(tick, 1000);
+  }
+  function pad(n) { return String(n).padStart(2,'0'); }
+
+  // ── SIGNAL ────────────────────────────────────────────────────
+  function setSignal(text, offline) {
+    document.getElementById('signal-text').textContent = text;
+    document.getElementById('signal-dot').classList.toggle('offline', offline);
+  }
+
+  // ── TABS ──────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.ptab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tab}`));
+  }
+
+  // ── STATS ─────────────────────────────────────────────────────
+  function renderActiveCount() {
+    document.getElementById('stat-conflicts').textContent = MAJOR_EVENTS.filter(e => e.type === 'war').length;
+    document.getElementById('stat-crises').textContent    = MAJOR_EVENTS.length;
+    document.getElementById('stat-countries').textContent = Object.keys(COUNTRY_DATA).length;
+  }
+
+  // ── SEARCH ────────────────────────────────────────────────────
+  function initSearch() {
+    const input   = document.getElementById('search-input');
+    const results = document.getElementById('search-results');
+    const clearBtn = document.getElementById('search-clear');
+    const allCountries = Object.entries(COUNTRY_DATA).map(([id, d]) => ({ id, ...d }));
+
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      clearBtn.classList.toggle('hidden', !q);
+      if (!q) { results.classList.add('hidden'); return; }
+
+      const matches = allCountries.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        (c.region || '').toLowerCase().includes(q) ||
+        c.tags.some(t => t.toLowerCase().includes(q))
+      ).sort((a,b) => b.risk - a.risk).slice(0, 8);
+
+      if (!matches.length) { results.classList.add('hidden'); return; }
+
+      results.innerHTML = matches.map(c => `
+        <div class="search-result-item" data-id="${c.id}">
+          <span class="sri-flag">${getFlag(c.alpha2)}</span>
+          <div class="sri-info">
+            <div class="sri-name">${escHtml(c.name)}</div>
+            <div class="sri-region">${escHtml(c.region || '')} · ${getRiskLabel(c.risk)}</div>
+          </div>
+          <span class="sri-risk">
+            <span class="sri-risk-dot" style="background:${getRiskColor(c.risk)}"></span>
+          </span>
+        </div>`).join('');
+
+      results.classList.remove('hidden');
+      results.querySelectorAll('.search-result-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const data = COUNTRY_DATA[el.dataset.id];
+          input.value = data.name;
+          results.classList.add('hidden');
+          clearBtn.classList.remove('hidden');
+          GeoMap.zoomToCountryId(el.dataset.id);
+          onCountrySelected(data, el.dataset.id);
+        });
+      });
+    });
+
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      clearBtn.classList.add('hidden');
+      results.classList.add('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#search-bar')) results.classList.add('hidden');
+    });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { input.blur(); results.classList.add('hidden'); }
+    });
+  }
+
+  // ── REGION BAR ────────────────────────────────────────────────
+  function initRegionBar() {
+    document.querySelectorAll('.region-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        GeoMap.flyToRegion(REGIONS[btn.dataset.region]);
+        if (btn.dataset.region === 'world') {
+          setTimeout(() => btn.classList.remove('active'), 600);
+        }
+      });
+    });
+  }
+
+  // ── TIMELINE SLIDER ───────────────────────────────────────────
+  function initTimeline() {
+    const slider = document.getElementById('timeline-slider');
+    const yearEl = document.getElementById('timeline-year');
+    const noteEl = document.getElementById('timeline-note');
+
+    slider.addEventListener('input', () => {
+      const yr = parseInt(slider.value);
+      yearEl.textContent = yr;
+      yearEl.className = 'mono ' + (yr === 2024 ? 'timeline-live' : 'timeline-historical');
+      noteEl.textContent = yr === 2024 ? 'Current threat assessment' : `Historical GPI data — ${yr}`;
+      GeoMap.applyHistoricalRisk(yr, GPI_HISTORY);
+    });
+  }
+
+  // ── TRAVEL CHECKER ────────────────────────────────────────────
+  function initTravel() {
+    const input    = document.getElementById('travel-input');
+    const btn      = document.getElementById('travel-check-btn');
+    const sugg     = document.getElementById('travel-suggestions');
+    const allC     = Object.entries(COUNTRY_DATA).map(([id,d]) => ({id,...d}));
+
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) { sugg.classList.add('hidden'); return; }
+      const m = allC.filter(c => c.name.toLowerCase().startsWith(q)).slice(0,5);
+      sugg.innerHTML = m.map(c => `
+        <div class="search-result-item" data-name="${escHtml(c.name)}">
+          <span class="sri-flag">${getFlag(c.alpha2)}</span>
+          <div class="sri-info">
+            <div class="sri-name">${escHtml(c.name)}</div>
+            <div class="sri-region">${getRiskLabel(c.risk)}</div>
+          </div>
+        </div>`).join('');
+      sugg.classList.toggle('hidden', !m.length);
+      sugg.querySelectorAll('.search-result-item').forEach(el => {
+        el.addEventListener('click', () => {
+          input.value = el.dataset.name;
+          sugg.classList.add('hidden');
+        });
+      });
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.travel-form')) sugg.classList.add('hidden');
+    });
+
+    btn.addEventListener('click', () => renderTravelBrief(input.value.trim()));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') renderTravelBrief(input.value.trim()); });
+  }
+
+  function renderTravelBrief(query) {
+    if (!query) return;
+    const country = findCountryByName(query);
+    if (!country) {
+      document.getElementById('travel-result').classList.add('hidden');
+      document.getElementById('travel-placeholder').innerHTML =
+        `<div class="ncs-icon">?</div><div class="ncs-text">COUNTRY NOT FOUND</div><div class="ncs-sub">Try a different spelling</div>`;
+      document.getElementById('travel-placeholder').classList.remove('hidden');
+      return;
+    }
+
+    const { data } = country;
+    const risk = data.risk;
+    const color = getRiskColor(risk);
+
+    const verdicts = [
+      null,
+      { text:'VERY SAFE TO VISIT',     cls:'verdict-safe'    }, // 1
+      { text:'SAFE TO VISIT',           cls:'verdict-safe'    }, // 2
+      { text:'GENERALLY SAFE',          cls:'verdict-safe'    }, // 3
+      { text:'EXERCISE CAUTION',        cls:'verdict-caution' }, // 4
+      { text:'SOME CAUTION ADVISED',    cls:'verdict-caution' }, // 5
+      { text:'ELEVATED RISK',           cls:'verdict-avoid'   }, // 6
+      { text:'HIGH RISK — RECONSIDER',  cls:'verdict-avoid'   }, // 7
+      { text:'DO NOT TRAVEL',           cls:'verdict-danger'  }, // 8
+      { text:'DO NOT TRAVEL',           cls:'verdict-danger'  }, // 9
+      { text:'EXTREME DANGER — AVOID',  cls:'verdict-extreme' }, // 10
+    ];
+
+    const v = verdicts[Math.min(risk, 10)];
+
+    const travelTips = getTravelTips(data);
+
+    document.getElementById('tr-flag').textContent = getFlag(data.alpha2);
+    document.getElementById('tr-country-name').textContent = data.name;
+    document.getElementById('tr-verdict-badge').textContent = v.text;
+    document.getElementById('tr-verdict-badge').className = `verdict-badge ${v.cls}`;
+
+    // Gauge needle position
+    const pct = ((risk - 1) / 9) * 100;
+    document.getElementById('tr-gauge-fill').style.left = `${pct}%`;
+
+    document.getElementById('tr-sections').innerHTML = travelTips;
+
+    document.getElementById('travel-placeholder').classList.add('hidden');
+    document.getElementById('travel-result').classList.remove('hidden');
+  }
+
+  function getTravelTips(data) {
+    const risk = data.risk;
+    const tags = data.tags || [];
+
+    const safetyLevel = risk <= 2 ? 'Very low' : risk <= 4 ? 'Low to moderate' :
+      risk <= 6 ? 'Moderate to elevated' : risk <= 8 ? 'High' : 'Extreme';
+
+    const crimeRisk = tags.some(t => ['crime','gangs','narco'].includes(t))
+      ? 'Organised crime, gang activity, or narco-violence present. Avoid late-night travel in city centres.'
+      : risk <= 3 ? 'Low crime risk. Standard precautions apply.' : 'Standard urban crime precautions advised.';
+
+    const terrorRisk = tags.some(t => ['terrorism','jihadist'].includes(t))
+      ? 'Active terrorism threat. Avoid crowded places, markets, and government buildings. Stay updated on local advisories.'
+      : risk <= 4 ? 'Low terrorism risk.' : 'Terrorism vigilance required.';
+
+    const politicalRisk = tags.some(t => ['war','invasion'].includes(t))
+      ? '⛔ Active armed conflict. Do not enter conflict zones. Military/rebel activity widespread.'
+      : tags.some(t => ['instability','coup','political'].includes(t))
+      ? 'Political unrest possible. Avoid demonstrations. Situation can change rapidly.'
+      : 'Politically stable. Monitor news.';
+
+    const health = risk <= 3 ? 'Good healthcare infrastructure. Travel insurance recommended.' :
+      risk <= 6 ? 'Healthcare may be limited outside capital. Travel insurance essential.' :
+      'Healthcare severely limited. Bring medical supplies. Evacuation insurance critical.';
+
+    const connectivity = tags.some(t => ['authoritarian','isolated'].includes(t))
+      ? 'Internet may be restricted. VPN recommended. Inform contacts of your itinerary.'
+      : 'Mobile coverage generally available in urban areas.';
+
+    const sections = [
+      { icon: '🛡️', title: 'OVERALL SAFETY',   body: `${safetyLevel} risk. ${data.info}` },
+      { icon: '🔫', title: 'CRIME & VIOLENCE',  body: crimeRisk },
+      { icon: '💥', title: 'TERRORISM',         body: terrorRisk },
+      { icon: '🏛️', title: 'POLITICAL CLIMATE', body: politicalRisk },
+      { icon: '🏥', title: 'HEALTH & MEDICAL',  body: health },
+      { icon: '📡', title: 'COMMUNICATIONS',    body: connectivity },
+    ];
+
+    return sections.map(s => `
+      <div class="tr-section">
+        <div class="tr-section-title">
+          <span class="tr-section-icon">${s.icon}</span> ${s.title}
+        </div>
+        <div class="tr-section-body">${escHtml(s.body)}</div>
+      </div>`).join('');
+  }
+
+  // ── COMPARE ───────────────────────────────────────────────────
+  function initCompare() {
+    initCompareSlot('a');
+    initCompareSlot('b');
+  }
+
+  function initCompareSlot(slot) {
+    const input = document.getElementById(`cmp-input-${slot}`);
+    const sugg  = document.getElementById(`cmp-sugg-${slot}`);
+    const allC  = Object.entries(COUNTRY_DATA).map(([id,d]) => ({id,...d}));
+
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) { sugg.classList.add('hidden'); return; }
+      const m = allC.filter(c => c.name.toLowerCase().includes(q)).slice(0,6);
+      sugg.innerHTML = m.map(c => `
+        <div class="search-result-item" data-name="${escHtml(c.name)}" data-id="${c.id}">
+          <span class="sri-flag">${getFlag(c.alpha2)}</span>
+          <div class="sri-info">
+            <div class="sri-name">${escHtml(c.name)}</div>
+            <div class="sri-region">${getRiskLabel(c.risk)}</div>
+          </div>
+        </div>`).join('');
+      sugg.classList.toggle('hidden', !m.length);
+      sugg.querySelectorAll('.search-result-item').forEach(el => {
+        el.addEventListener('click', () => {
+          input.value = el.dataset.name;
+          sugg.classList.add('hidden');
+          setCompareSlot(slot, COUNTRY_DATA[el.dataset.id]);
+        });
+      });
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest(`#cmp-slot-${slot}`)) sugg.classList.add('hidden');
+    });
+  }
+
+  function setCompareSlot(slot, data) {
+    if (slot === 'a') compareA = data; else compareB = data;
+
+    const preview = document.getElementById(`cmp-preview-${slot}`);
+    const color   = getRiskColor(data.risk);
+    preview.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span class="cmp-preview-flag">${getFlag(data.alpha2)}</span>
+        <span class="cmp-preview-name">${escHtml(data.name)}</span>
+      </div>
+      <div class="cmp-preview-risk" style="color:${color}">${getRiskLabel(data.risk)} · ${data.risk}/10</div>
+      <div class="cmp-preview-bar">
+        <div class="cmp-preview-fill" style="width:${data.risk*10}%;background:${color}"></div>
+      </div>`;
+    preview.classList.remove('hidden');
+
+    if (document.getElementById(`cmp-input-${slot}`).value !== data.name) {
+      document.getElementById(`cmp-input-${slot}`).value = data.name;
+    }
+
+    if (compareA && compareB) renderComparison();
+  }
+
+  function renderComparison() {
+    const a = compareA, b = compareB;
+    document.getElementById('compare-result').classList.remove('hidden');
+
+    const colA = (val) => `<div class="cmp-col cmp-metric-val ${val === Math.min(a.risk,b.risk) ? 'cmp-winner' : ''}">${val}</div>`;
+    const winA = a.risk < b.risk, winB = b.risk < a.risk;
+
+    document.getElementById('cmp-head-a').innerHTML = `
+      <div class="cmp-col-flag">${getFlag(a.alpha2)}</div>
+      <div class="cmp-col-name">${escHtml(a.name)}</div>
+      <div class="cmp-col-score" style="color:${getRiskColor(a.risk)}">${getRiskLabel(a.risk)}</div>`;
+    document.getElementById('cmp-head-b').innerHTML = `
+      <div class="cmp-col-flag">${getFlag(b.alpha2)}</div>
+      <div class="cmp-col-name">${escHtml(b.name)}</div>
+      <div class="cmp-col-score" style="color:${getRiskColor(b.risk)}">${getRiskLabel(b.risk)}</div>`;
+
+    const metrics = [
+      { label: 'RISK SCORE',
+        a: `<span style="color:${getRiskColor(a.risk)};font-weight:bold">${a.risk}/10</span>`,
+        b: `<span style="color:${getRiskColor(b.risk)};font-weight:bold">${b.risk}/10</span>`,
+        winnerA: winA, winnerB: winB },
+      { label: 'REGION',    a: a.region||'—', b: b.region||'—', winnerA:false, winnerB:false },
+      { label: 'KEY RISKS',
+        a: (a.tags||[]).slice(0,3).map(t=>`<span class="cp-tag ${getTagClass(t)}">${t}</span>`).join(' ')||'None',
+        b: (b.tags||[]).slice(0,3).map(t=>`<span class="cp-tag ${getTagClass(t)}">${t}</span>`).join(' ')||'None',
+        winnerA:false, winnerB:false },
+      { label: 'ASSESSMENT', a: escHtml((a.info||'').slice(0,80)+'…'), b: escHtml((b.info||'').slice(0,80)+'…'), winnerA:false, winnerB:false },
+      { label: 'SAFER FOR TRAVEL', a: a.risk<b.risk?'✓ YES':'—', b: b.risk<a.risk?'✓ YES':'—', winnerA:winA, winnerB:winB },
+    ];
+
+    document.getElementById('cmp-metrics').innerHTML = metrics.map(m => `
+      <div class="cmp-metric-row">
+        <div class="cmp-metric-label">${m.label}</div>
+        <div class="cmp-metric-val ${m.winnerA ? 'cmp-winner' : ''}">${m.a}</div>
+        <div class="cmp-metric-val ${m.winnerB ? 'cmp-winner' : ''}">${m.b}</div>
+      </div>`).join('');
+  }
+
+  // ── COUNTRY SELECTED ─────────────────────────────────────────
+  function onCountrySelected(data, id) {
+    const noSel   = document.getElementById('no-country-selected');
+    const profile = document.getElementById('country-profile');
+    currentCountry = data;
+
+    if (!data) {
+      noSel.classList.remove('hidden');
+      profile.classList.add('hidden');
+      return;
+    }
+    switchTab('country');
+    noSel.classList.add('hidden');
+    profile.classList.remove('hidden');
+
+    const color = getRiskColor(data.risk);
+    document.getElementById('cp-flag').textContent   = getFlag(data.alpha2);
+    document.getElementById('cp-name').textContent   = data.name;
+    document.getElementById('cp-region').textContent = (data.region||'').toUpperCase();
+    document.getElementById('cp-risk-label').textContent = 'THREAT ASSESSMENT';
+    document.getElementById('cp-risk-fill').style.cssText  = `width:${data.risk*10}%;background:${color}`;
+    document.getElementById('cp-risk-score').style.color   = color;
+    document.getElementById('cp-risk-score').textContent   = `${getRiskLabel(data.risk)}  (${data.risk}/10)`;
+    document.getElementById('cp-tags').innerHTML = (data.tags||[]).map(t =>
+      `<span class="cp-tag ${getTagClass(t)}">${t}</span>`).join('');
+    document.getElementById('cp-info').textContent = data.info||'';
+    document.getElementById('cp-news').innerHTML =
+      `<div class="news-item"><div class="ni-title" style="color:var(--text-dim);font-style:italic">Searching intelligence feed…</div></div>`;
+    fetchCountryNews(data.name);
+  }
+
+  // ── EVENT DETAIL ──────────────────────────────────────────────
+  function showEventDetail(ev) {
+    switchTab('country');
+    GeoMap.deselectCountry();
+    currentCountry = null;
+
+    const noSel  = document.getElementById('no-country-selected');
+    const profile = document.getElementById('country-profile');
+    noSel.classList.add('hidden');
+    profile.classList.remove('hidden');
+
+    const color = getEventColor(ev.type);
+    const icon  = {war:'⚔️', terrorism:'💥', geopolitical:'🌐', instability:'⚠️', crime:'🔫'}[ev.type]||'⚠️';
+
+    document.getElementById('cp-flag').textContent = icon;
+    document.getElementById('cp-name').textContent = ev.name;
+    document.getElementById('cp-region').textContent = ev.location.toUpperCase();
+    document.getElementById('cp-risk-label').textContent = `SEVERITY · ${ev.type.toUpperCase()}`;
+    document.getElementById('cp-risk-fill').style.cssText = `width:${ev.severity*10}%;background:${color}`;
+    document.getElementById('cp-risk-score').style.color  = color;
+    document.getElementById('cp-risk-score').textContent  = `${getRiskLabel(ev.severity)} (${ev.severity}/10)`;
+    document.getElementById('cp-tags').innerHTML =
+      [ev.type, ev.started ? `since ${ev.started}` : ''].filter(Boolean).map(t =>
+        `<span class="cp-tag ${getTagClass(t)}">${t}</span>`).join('');
+    document.getElementById('cp-info').textContent = ev.info;
+    document.getElementById('cp-news').innerHTML =
+      `<div class="news-item"><div class="ni-title" style="color:var(--text-dim);font-style:italic">Loading related intelligence…</div></div>`;
+    fetchCountryNews(ev.name.split('–')[0].split('/')[0].trim(), true);
+  }
+
+  // ── COUNTRY NEWS ──────────────────────────────────────────────
+  async function fetchCountryNews(term) {
+    const el = document.getElementById('cp-news');
+    if (!el) return;
+    try {
+      const kw  = term.toLowerCase().split(/[\s–\/]/)[0];
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(kw)}&mode=artlist&format=json&maxrecords=15&sort=DateDesc`;
+      const res  = await fetch(url);
+      const data = await res.json();
+      const items = (data.articles || []).filter(a => a.title);
+      if (!items.length) {
+        el.innerHTML = `<div class="news-item"><div class="ni-title" style="color:var(--text-dim);font-style:italic">No recent GDELT matches. Check the Intel Feed tab for global headlines.</div></div>`;
+        return;
+      }
+      el.innerHTML = items.slice(0,8).map(a => newsItemHTML(a.title, a.domain, a.seendate, a.url)).join('');
+    } catch {
+      el.innerHTML = `<div class="news-item"><div class="ni-title" style="color:var(--text-dim)">Feed temporarily unavailable</div></div>`;
+    }
+  }
+
+  // ── FETCH NEWS ────────────────────────────────────────────────
+  async function fetchNews() {
+    try {
+      let items = [];
+
+      if (IS_LOCAL) {
+        // Local dev: use Express proxy (handles CORS + caching server-side)
+        const res  = await fetch('/api/news');
+        const json = await res.json();
+        items = json.items || [];
+      } else {
+        // Deployed: fetch RSS feeds directly via rss2json.com CORS bridge
+        const results = await Promise.allSettled(
+          PUBLIC_FEEDS.map(async (feed) => {
+            const res  = await fetch(RSS_TO_JSON + encodeURIComponent(feed.url));
+            const data = await res.json();
+            if (data.status !== 'ok' || !data.items) return [];
+            return data.items.slice(0, 8).map(i => ({
+              title:  (i.title || '').replace(/\s+/g,' ').trim(),
+              source: feed.source,
+              date:   i.pubDate || '',
+              link:   i.link    || '',
+            })).filter(i => i.title.length > 10);
+          })
+        );
+        results.forEach(r => { if (r.status === 'fulfilled') items.push(...r.value); });
+        items.sort((a, b) => new Date(b.date) - new Date(a.date));
+      }
+
+      document.getElementById('stat-news').textContent =
+        [...new Set(items.map(i => i.source))].length || '--';
+      setSignal('SIGNAL LIVE', false);
+      setTickerItems(items);
+    } catch {
+      setSignal('SIGNAL LOST', true);
+    }
+  }
+
+  async function fetchGdelt() {
+    // GDELT's API supports CORS — always call directly regardless of environment
+    try {
+      const queries = [
+        'conflict war military attack',
+        'protest unrest crisis',
+        'sanctions coup insurgency',
+      ];
+      const allArticles = [];
+      for (const q of queries) {
+        try {
+          const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q)}&mode=artlist&format=json&maxrecords=20&sort=DateDesc`;
+          const res  = await fetch(url);
+          const data = await res.json();
+          if (data.articles) {
+            allArticles.push(...data.articles.map(a => ({
+              title:   a.title,
+              domain:  a.domain,
+              url:     a.url,
+              date:    a.seendate,
+              country: a.sourcecountry || '',
+            })));
+          }
+        } catch { /* one query failing is fine */ }
+      }
+      const seen   = new Set();
+      const unique = allArticles.filter(a => {
+        if (!a.title || seen.has(a.title)) return false;
+        seen.add(a.title); return true;
+      });
+      unique.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+      renderGdeltList(unique.slice(0, 50));
+    } catch { /* silent */ }
+  }
+
+  // ── RENDER GDELT ──────────────────────────────────────────────
+  function renderGdeltList(articles) {
+    const el = document.getElementById('gdelt-list');
+    if (!el) return;
+    if (!articles.length) {
+      el.innerHTML = `<div class="news-item" style="padding:14px;color:var(--text-dim);font-size:11px;font-style:italic">Waiting for GDELT feed…</div>`;
+      return;
+    }
+    el.innerHTML = articles.slice(0,30).map(a =>
+      newsItemHTML(a.title, a.domain, a.date, a.url)).join('');
+  }
+
+  // ── EVENT CARDS ───────────────────────────────────────────────
+  function renderEventCards() {
+    const list = document.getElementById('events-list');
+    list.innerHTML = '';
+    [...MAJOR_EVENTS].sort((a,b) => b.severity - a.severity).forEach(ev => {
+      const color = getEventColor(ev.type);
+      const card  = document.createElement('div');
+      card.className = 'event-card';
+      card.innerHTML = `
+        <div class="ec-stripe" style="background:${color}"></div>
+        <div class="ec-body">
+          <div class="ec-name">${ev.name}</div>
+          <div class="ec-location">${ev.location} · ${ev.started||''}</div>
+          <div class="ec-info">${ev.info}</div>
+        </div>
+        <div class="ec-severity" style="color:${color}">
+          ${[1,2,3,4,5].map(i=>`<div class="sev-pip ${i<=Math.round(ev.severity/2)?'active':''}"></div>`).join('')}
+        </div>`;
+      card.addEventListener('click', () => showEventDetail(ev));
+      list.appendChild(card);
+    });
+  }
+
+  // ── NEWS ITEM HTML ────────────────────────────────────────────
+  function newsItemHTML(title, source, date, url) {
+    const src      = (source||'UNKNOWN').replace(/\./g,'-').slice(0,20);
+    const srcClass = ['BBC','Guardian','NYT','Reuters','Al-Jazeera','Al Jazeera','FP'].includes(src)
+      ? src.replace(/\s+/g,'-') : 'default';
+    const ago  = timeAgo(date);
+    const link = url ? `href="${url}" target="_blank" rel="noopener"` : '';
+    return `
+      <a class="news-item" ${link} style="text-decoration:none;display:block;">
+        <div class="ni-header">
+          <span class="ni-source ${srcClass}">${escHtml((source||'').slice(0,14))}</span>
+          ${ago ? `<span class="ni-date">${ago}</span>` : ''}
+        </div>
+        <div class="ni-title">${escHtml(title)}</div>
+      </a>`;
+  }
+
+  // ── TICKER ────────────────────────────────────────────────────
+  function setTickerItems(items) {
+    const tape = document.getElementById('ticker-tape');
+    if (!tape || !items.length) return;
+
+    const duped = [...items, ...items];
+    tape.innerHTML = duped.map(item => {
+      const src = (item.source||'').replace(/\s+/g,'-');
+      return `<span class="ticker-item">
+        <span class="ticker-source ni-source ${src}">${escHtml(item.source||'')}</span>
+        <span class="ticker-title">${escHtml(item.title||'')}</span>
+      </span><span class="ticker-sep">◆</span>`;
+    }).join('');
+
+    tape.style.transform = 'translateX(0)';
+    tickerOffset = 0; lastTickerTs = null;
+    if (tickerAnim) cancelAnimationFrame(tickerAnim);
+    animateTicker();
+  }
+
+  function animateTicker() {
+    const tape  = document.getElementById('ticker-tape');
+    if (!tape) return;
+    const halfW = tape.scrollWidth / 2;
+
+    function step(ts) {
+      if (!lastTickerTs) lastTickerTs = ts;
+      const dt = (ts - lastTickerTs) / 1000;
+      lastTickerTs = ts;
+      tickerOffset = (tickerOffset + TICKER_SPEED * dt) % halfW;
+      tape.style.transform = `translateX(-${tickerOffset}px)`;
+      tickerAnim = requestAnimationFrame(step);
+    }
+    tickerAnim = requestAnimationFrame(step);
+  }
+
+  // ── HISTORICAL GPI DATA ───────────────────────────────────────
+  function buildGpiHistory() {
+    // 17 years: 2008–2024. Values are approximate risk (1–10) per year.
+    // Key war/crisis shifts encoded. Countries not listed interpolate from current.
+    return {
+      // Ukraine: pre-Maidan safe → Donbas 2014 → full war 2022
+      "804": [2,2,2,2,3,5,7,6,6,6,6,6,6,6,10,10,10],
+      // Syria: stable → civil war 2011 → chaos → partial stabilise
+      "760": [3,3,3,3,6,9,10,10,10,10,10,10,10,10,10,9,9],
+      // Yemen: tense → war 2015
+      "887": [5,5,6,6,6,8,10,10,10,10,10,10,10,10,10,10,10],
+      // Sudan: darfur simmering → civil war 2023
+      "729": [7,7,7,8,8,7,7,7,7,7,7,7,7,8,8,10,10],
+      // Myanmar: military rule → brief opening → coup 2021
+      "104": [7,7,7,7,7,6,5,5,5,5,5,6,8,10,10,10,10],
+      // Libya: stable Gaddafi → collapse 2011
+      "434": [3,3,3,4,9,9,9,9,9,9,9,9,9,8,8,8,8],
+      // Afghanistan: steadily bad → worse post-Taliban 2021
+      "4":   [9,9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10],
+      // Iraq: war → recovering
+      "368": [9,9,9,8,8,7,7,8,9,8,8,8,8,8,7,7,7],
+      // Somalia: consistently awful
+      "706": [10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10],
+      // DRC: chronic instability, worsening
+      "180": [8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9],
+      // Lebanon: stable → crisis 2019 → war
+      "422": [5,5,4,4,5,6,6,6,6,6,7,7,8,8,8,8,8],
+      // Venezuela: ok → collapse
+      "862": [4,4,5,5,5,6,7,8,8,8,8,8,8,8,8,8,8],
+      // Haiti: always fragile → worse
+      "332": [6,6,7,7,7,7,7,7,7,7,8,8,8,8,9,9,9],
+      // Mali: stable → coup+jihadists 2012
+      "466": [4,4,4,5,9,9,9,9,9,9,9,9,9,9,9,9,9],
+      // Russia: improving then war
+      "643": [5,5,5,5,5,5,6,6,6,6,6,6,6,6,7,8,8],
+    };
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────
+  function findCountryByName(q) {
+    const ql = q.toLowerCase();
+    const entry = Object.entries(COUNTRY_DATA).find(([,d]) =>
+      d.name.toLowerCase() === ql ||
+      d.name.toLowerCase().startsWith(ql));
+    if (!entry) return null;
+    return { id: entry[0], data: entry[1] };
+  }
+
+  function escHtml(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  return { init, showEventDetail };
+})();
+
+document.addEventListener('DOMContentLoaded', App.init);

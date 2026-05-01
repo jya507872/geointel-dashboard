@@ -1,0 +1,18 @@
+{
+  "name": "geopolitical-dashboard",
+  "version": "1.0.0",
+  "description": "Open-source intelligence geopolitical heatmap dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "launch": "./start.sh",
+    "deploy": "npx netlify-cli deploy --prod --dir=public",
+    "deploy:login": "npx netlify-cli login && npx netlify-cli deploy --prod --dir=public"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "rss-parser": "^3.13.0",
+    "node-fetch": "^2.7.0"
+  }
+}
