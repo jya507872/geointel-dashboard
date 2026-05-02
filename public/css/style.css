@@ -1374,6 +1374,233 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 .cmp-winner { background: rgba(0,180,255,0.05); }
 
+/* ── LIVE TV ─────────────────────────────────────────────────── */
+
+/* Channel tier label */
+.tv-tier-label {
+  font-family: var(--mono);
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  padding: 8px 14px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Channel grid row */
+.tv-channel-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Channel button */
+.tv-ch-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.2;
+}
+.tv-ch-btn:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+  color: var(--text-bright);
+}
+.tv-ch-btn.active {
+  border-color: var(--accent);
+  background: rgba(0,180,255,0.1);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(0,180,255,0.15);
+}
+.tv-ch-btn.state-media {
+  border-color: rgba(255,140,0,0.3);
+}
+.tv-ch-btn.state-media:hover,
+.tv-ch-btn.state-media.active {
+  border-color: rgba(255,140,0,0.7);
+  background: rgba(255,140,0,0.1);
+  color: #ffaa44;
+}
+
+.tv-ch-flag { font-size: 14px; line-height: 1; flex-shrink: 0; }
+.tv-ch-name { font-size: 10px; white-space: nowrap; }
+
+/* Player wrapper */
+#tv-player-wrap { padding: 0; }
+
+#tv-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.tv-ctrl-btn {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+.tv-ctrl-btn:hover {
+  border-color: var(--border-bright);
+  color: var(--text-bright);
+  background: var(--bg-hover);
+}
+
+#tv-player-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 */
+  height: 0;
+  overflow: hidden;
+  background: #000;
+}
+#tv-iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  border: none;
+}
+
+#tv-player-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.tv-direct-link-btn {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 3px 7px;
+  border: 1px solid rgba(0,180,255,0.3);
+  border-radius: 3px;
+  background: rgba(0,180,255,0.06);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.tv-direct-link-btn:hover {
+  background: rgba(0,180,255,0.15);
+  border-color: var(--accent);
+}
+
+#tv-unavailable {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 20px 14px;
+  gap: 8px;
+  color: var(--text-dim);
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+#tv-disclaimer {
+  padding: 10px 14px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+}
+
+/* ── FLOATING TV PLAYER ──────────────────────────────────────── */
+#tv-float {
+  position: fixed;
+  width: 360px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,180,255,0.1);
+  z-index: 500;
+  overflow: hidden;
+  right: 360px;
+  bottom: 50px;
+}
+#tv-float.tv-float-large {
+  width: 560px;
+}
+
+#tv-float-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+  user-select: none;
+}
+#tv-float-header:active { cursor: grabbing; }
+
+#tv-float-body {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  background: #000;
+}
+#tv-float-iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  border: none;
+}
+
+#tv-float-resize-handle {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 14px; height: 14px;
+  cursor: nw-resize;
+  opacity: 0.3;
+  background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+}
+
+/* Mobile: float player full-width */
+@media (max-width: 768px) {
+  #tv-float {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    bottom: calc(var(--ticker-h) + 8px) !important;
+    top: auto !important;
+  }
+  #tv-float.tv-float-large { width: auto !important; }
+}
+
 /* ── TRUST BADGES ────────────────────────────────────────────── */
 .trust-badge {
   font-family: var(--mono);

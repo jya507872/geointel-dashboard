@@ -168,10 +168,11 @@
     <!-- ── INTEL PANEL ─────────────────────────────────────────── -->
     <aside id="intel-panel">
       <div id="panel-tabs">
-        <button class="ptab active" data-tab="feed">INTEL FEED</button>
+        <button class="ptab active" data-tab="feed">FEED</button>
         <button class="ptab" data-tab="country">COUNTRY</button>
-        <button class="ptab" data-tab="travel">✈ TRAVEL</button>
-        <button class="ptab" data-tab="compare">⇔ COMPARE</button>
+        <button class="ptab" data-tab="travel">✈</button>
+        <button class="ptab" data-tab="compare">⇔</button>
+        <button class="ptab" data-tab="tv">📺 LIVE</button>
       </div>
 
       <!-- ── INTEL FEED TAB ──────────────────────────────────── -->
@@ -316,8 +317,73 @@
           <div id="cmp-metrics"></div>
         </div>
       </div>
+      <!-- ── LIVE TV TAB ──────────────────────────────────────── -->
+      <div id="tab-tv" class="tab-content">
+        <div class="panel-section-title">
+          <span class="section-icon">📺</span> LIVE NEWS TV
+          <span id="tv-playing-badge" class="source-badge" style="display:none"></span>
+        </div>
+
+        <!-- Channel grid -->
+        <div id="tv-channel-grid"></div>
+
+        <!-- Embedded player -->
+        <div id="tv-player-wrap" class="hidden">
+          <div id="tv-player-header">
+            <span id="tv-player-channel-name"></span>
+            <div style="display:flex;gap:6px">
+              <button id="tv-popout-btn" class="tv-ctrl-btn" title="Float player over map">⤢</button>
+              <button id="tv-close-btn"  class="tv-ctrl-btn" title="Close player">✕</button>
+            </div>
+          </div>
+          <div id="tv-player-container">
+            <iframe id="tv-iframe"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowfullscreen
+              frameborder="0"
+              title="Live News Stream">
+            </iframe>
+          </div>
+          <div id="tv-player-footer">
+            <span id="tv-trust-label"></span>
+            <a id="tv-direct-link" href="#" target="_blank" rel="noopener" class="tv-direct-link-btn">▶ Watch on YouTube</a>
+          </div>
+        </div>
+
+        <!-- Unavailable state -->
+        <div id="tv-unavailable" class="hidden">
+          <div class="ncs-icon" style="font-size:22px">⚠</div>
+          <div class="ncs-text" id="tv-unavail-msg">STREAM NOT AVAILABLE</div>
+          <div class="ncs-sub" id="tv-unavail-sub"></div>
+        </div>
+
+        <div id="tv-disclaimer">
+          <span style="color:var(--accent);font-style:normal">ℹ</span>
+          Streams are official YouTube live broadcasts. State-affiliated channels are labeled. All times UTC.
+        </div>
+      </div>
     </aside>
   </main>
+
+  <!-- Floating pop-out TV player (hidden until activated) -->
+  <div id="tv-float" class="hidden">
+    <div id="tv-float-header">
+      <span id="tv-float-title"></span>
+      <div style="display:flex;gap:4px">
+        <button class="tv-ctrl-btn" id="tv-float-size" title="Resize">⊞</button>
+        <button class="tv-ctrl-btn" id="tv-float-close" title="Close">✕</button>
+      </div>
+    </div>
+    <div id="tv-float-body">
+      <iframe id="tv-float-iframe"
+        allow="autoplay; encrypted-media; picture-in-picture"
+        allowfullscreen
+        frameborder="0"
+        title="Live News Stream">
+      </iframe>
+    </div>
+    <div id="tv-float-resize-handle"></div>
+  </div>
 
   <!-- ── LIVE NEWS TICKER ───────────────────────────────────────── -->
   <footer id="ticker-footer">
