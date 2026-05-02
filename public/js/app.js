@@ -10,12 +10,34 @@ const App = (() => {
 
   // rss2json.com converts RSS → JSON with CORS support (free, no key needed)
   const RSS_TO_JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+  // Tiered feeds: tier 1 = wire services, 2 = major journalism, 3 = quality specialty
+  // Social media screened separately via Reddit public API
   const PUBLIC_FEEDS = [
-    { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',                source: 'BBC'        },
-    { url: 'https://www.aljazeera.com/xml/rss/all.xml',                  source: 'Al Jazeera' },
-    { url: 'https://www.theguardian.com/world/rss',                       source: 'Guardian'   },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',     source: 'NYT'        },
-    { url: 'https://foreignpolicy.com/feed/',                             source: 'FP'         },
+    // ── TIER 1: Wire Services ────────────────────────────────────
+    { url: 'https://feeds.reuters.com/reuters/worldNews',                  source: 'Reuters',        tier: 1 },
+    { url: 'https://rss.app/feeds/tBtCCLz9uQvGnomp.xml',                 source: 'AP',             tier: 1 },
+    // ── TIER 2: Established International Journalism ─────────────
+    { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',                 source: 'BBC',            tier: 2 },
+    { url: 'https://www.theguardian.com/world/rss',                        source: 'Guardian',       tier: 2 },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',      source: 'NYT',            tier: 2 },
+    { url: 'https://feeds.washingtonpost.com/rss/world',                   source: 'Washington Post', tier: 2 },
+    { url: 'https://www.ft.com/world?format=rss',                          source: 'Financial Times', tier: 2 },
+    // ── TIER 3: Quality Regional & Specialty ─────────────────────
+    { url: 'https://www.aljazeera.com/xml/rss/all.xml',                   source: 'Al Jazeera',     tier: 3 },
+    { url: 'https://feeds.dw.com/rss/rss__en_world',                      source: 'Deutsche Welle', tier: 3 },
+    { url: 'https://www.france24.com/en/rss',                             source: 'France 24',      tier: 3 },
+    { url: 'https://www.rferl.org/api/epiqq',                             source: 'RFE/RL',         tier: 3 },
+    { url: 'https://foreignpolicy.com/feed/',                              source: 'Foreign Policy', tier: 3 },
+    { url: 'https://foreignaffairs.com/rss.xml',                          source: 'Foreign Affairs', tier: 3 },
+    { url: 'https://feeds.bellingcat.com/bellingcat',                     source: 'Bellingcat',     tier: 3 },
+  ];
+
+  // Reddit public API — social media screening tier (UNVERIFIED, needs cross-check)
+  const REDDIT_FEEDS = [
+    { sub: 'worldnews',   label: 'r/worldnews' },
+    { sub: 'geopolitics', label: 'r/geopolitics' },
+    { sub: 'UkraineWarVideoReport', label: 'r/UkrWar' },
   ];
 
   let tickerAnim    = null;
@@ -72,6 +94,18 @@ const App = (() => {
     setInterval(fetchNews,  NEWS_POLL_MS);
     setInterval(fetchGdelt, GDELT_POLL_MS);
     setSignal('SIGNAL LIVE', false);
+
+    // Mobile panel toggle
+    const mobileToggle = document.getElementById('mobile-panel-toggle');
+    const intelPanel   = document.getElementById('intel-panel');
+    if (mobileToggle) {
+      mobileToggle.addEventListener('click', () => {
+        const open = intelPanel.classList.toggle('mobile-open');
+        mobileToggle.textContent = open ? '✕' : '◈ INTEL';
+        document.getElementById('map-wrapper').classList.toggle('panel-open', open);
+      });
+    }
+
   }
 
   // ── CLOCK ─────────────────────────────────────────────────────
@@ -264,7 +298,7 @@ const App = (() => {
 
     const v = verdicts[Math.min(risk, 10)];
 
-    const travelTips = getTravelTips(data);
+    const travelTips = getTravelTips(data, country.id);
 
     document.getElementById('tr-flag').textContent = getFlag(data.alpha2);
     document.getElementById('tr-country-name').textContent = data.name;
@@ -281,9 +315,10 @@ const App = (() => {
     document.getElementById('travel-result').classList.remove('hidden');
   }
 
-  function getTravelTips(data) {
+  function getTravelTips(data, countryId) {
     const risk = data.risk;
     const tags = data.tags || [];
+    const air  = getAirAccess(countryId);
 
     const safetyLevel = risk <= 2 ? 'Very low' : risk <= 4 ? 'Low to moderate' :
       risk <= 6 ? 'Moderate to elevated' : risk <= 8 ? 'High' : 'Extreme';
@@ -310,8 +345,15 @@ const App = (() => {
       ? 'Internet may be restricted. VPN recommended. Inform contacts of your itinerary.'
       : 'Mobile coverage generally available in urban areas.';
 
+    const airTierColors = { open:'#44ee88', limited:'#ffdd44', restricted:'#ff8844', charter:'#ff6622', closed:'#ff3333' };
+    const airColor = airTierColors[air.tier] || '#aaa';
+    const airBody  = `<span class="air-badge air-${air.tier}">${air.label}</span> ${air.note}${
+      air.hubs.length ? ` <span class="air-hubs">Hub codes: ${air.hubs.join(' · ')}</span>` : ''
+    }`;
+
     const sections = [
       { icon: '🛡️', title: 'OVERALL SAFETY',   body: `${safetyLevel} risk. ${data.info}` },
+      { icon: '✈',  title: 'FLIGHT ACCESS',    body: airBody, isHtml: true },
       { icon: '🔫', title: 'CRIME & VIOLENCE',  body: crimeRisk },
       { icon: '💥', title: 'TERRORISM',         body: terrorRisk },
       { icon: '🏛️', title: 'POLITICAL CLIMATE', body: politicalRisk },
@@ -324,7 +366,7 @@ const App = (() => {
         <div class="tr-section-title">
           <span class="tr-section-icon">${s.icon}</span> ${s.title}
         </div>
-        <div class="tr-section-body">${escHtml(s.body)}</div>
+        <div class="tr-section-body">${s.isHtml ? s.body : escHtml(s.body)}</div>
       </div>`).join('');
   }
 
@@ -438,6 +480,17 @@ const App = (() => {
       profile.classList.add('hidden');
       return;
     }
+
+    // On mobile: auto-open the panel and update toggle button
+    if (window.innerWidth <= 768) {
+      const panel  = document.getElementById('intel-panel');
+      const toggle = document.getElementById('mobile-panel-toggle');
+      if (panel && !panel.classList.contains('mobile-open')) {
+        panel.classList.add('mobile-open');
+        if (toggle) toggle.textContent = '✕';
+      }
+    }
+
     switchTab('country');
     noSel.classList.add('hidden');
     profile.classList.remove('hidden');
@@ -514,36 +567,92 @@ const App = (() => {
       let items = [];
 
       if (IS_LOCAL) {
-        // Local dev: use Express proxy (handles CORS + caching server-side)
         const res  = await fetch('/api/news');
         const json = await res.json();
-        items = json.items || [];
+        items = (json.items || []).map(i => ({ ...i, tier: 2 }));
       } else {
-        // Deployed: fetch RSS feeds directly via rss2json.com CORS bridge
+        // Deployed: fetch all tiers via rss2json CORS bridge
         const results = await Promise.allSettled(
           PUBLIC_FEEDS.map(async (feed) => {
-            const res  = await fetch(RSS_TO_JSON + encodeURIComponent(feed.url));
-            const data = await res.json();
-            if (data.status !== 'ok' || !data.items) return [];
-            return data.items.slice(0, 8).map(i => ({
-              title:  (i.title || '').replace(/\s+/g,' ').trim(),
-              source: feed.source,
-              date:   i.pubDate || '',
-              link:   i.link    || '',
-            })).filter(i => i.title.length > 10);
+            try {
+              const res  = await fetch(RSS_TO_JSON + encodeURIComponent(feed.url));
+              const data = await res.json();
+              if (data.status !== 'ok' || !data.items) return [];
+              return data.items.slice(0, 6).map(i => ({
+                title:  (i.title || '').replace(/\s+/g,' ').trim(),
+                source: feed.source,
+                tier:   feed.tier,
+                date:   i.pubDate || '',
+                link:   i.link    || '',
+              })).filter(i => i.title.length > 10);
+            } catch { return []; }
           })
         );
         results.forEach(r => { if (r.status === 'fulfilled') items.push(...r.value); });
         items.sort((a, b) => new Date(b.date) - new Date(a.date));
       }
 
-      document.getElementById('stat-news').textContent =
-        [...new Set(items.map(i => i.source))].length || '--';
+      // Social media screening — fetch Reddit in parallel, tag as UNVERIFIED
+      fetchSocialMedia().then(socialItems => {
+        if (socialItems.length) {
+          renderSocialLayer(socialItems);
+        }
+      });
+
+      const sourcesLive = [...new Set(items.map(i => i.source))].length;
+      document.getElementById('stat-news').textContent = sourcesLive || '--';
       setSignal('SIGNAL LIVE', false);
       setTickerItems(items);
     } catch {
       setSignal('SIGNAL LOST', true);
     }
+  }
+
+  // ── SOCIAL MEDIA SCREENING (Reddit — Unverified) ───────────────
+  async function fetchSocialMedia() {
+    const items = [];
+    await Promise.allSettled(
+      REDDIT_FEEDS.map(async (feed) => {
+        try {
+          const res  = await fetch(
+            `https://www.reddit.com/r/${feed.sub}/hot.json?limit=8`,
+            { headers: { 'Accept': 'application/json' } }
+          );
+          const data = await res.json();
+          const posts = data?.data?.children || [];
+          posts.forEach(p => {
+            const d = p.data;
+            if (!d.title || d.stickied || d.score < 500) return;
+            items.push({
+              title:    d.title,
+              source:   feed.label,
+              tier:     4,
+              score:    d.score,
+              link:     `https://reddit.com${d.permalink}`,
+              date:     new Date(d.created_utc * 1000).toISOString(),
+              isSocial: true,
+            });
+          });
+        } catch { /* Reddit may block in some regions */ }
+      })
+    );
+    return items.sort((a, b) => b.score - a.score).slice(0, 10);
+  }
+
+  function renderSocialLayer(items) {
+    const el = document.getElementById('social-feed');
+    if (!el) return;
+    el.innerHTML = items.map(item => `
+      <a class="news-item social-item" href="${item.link}" target="_blank" rel="noopener" style="text-decoration:none;display:block;">
+        <div class="ni-header">
+          <span class="trust-badge trust-social">⚠ UNVERIFIED</span>
+          <span class="ni-source social-src">${escHtml(item.source)}</span>
+          <span class="ni-date">${timeAgo(item.date)}</span>
+        </div>
+        <div class="ni-title">${escHtml(item.title)}</div>
+        <div class="social-disclaimer">Social media — requires cross-check with verified sources before treating as confirmed</div>
+      </a>`).join('');
+    document.getElementById('social-section').classList.remove('hidden');
   }
 
   async function fetchGdelt() {
@@ -589,8 +698,10 @@ const App = (() => {
       el.innerHTML = `<div class="news-item" style="padding:14px;color:var(--text-dim);font-size:11px;font-style:italic">Waiting for GDELT feed…</div>`;
       return;
     }
-    el.innerHTML = articles.slice(0,30).map(a =>
-      newsItemHTML(a.title, a.domain, a.date, a.url)).join('');
+    el.innerHTML = articles.slice(0,30).map(a => {
+      const trust = getSourceTrust(a.domain || a.source || '');
+      return newsItemHTML(a.title, a.domain, a.date, a.url, trust.level);
+    }).join('');
   }
 
   // ── EVENT CARDS ───────────────────────────────────────────────
@@ -617,16 +728,24 @@ const App = (() => {
   }
 
   // ── NEWS ITEM HTML ────────────────────────────────────────────
-  function newsItemHTML(title, source, date, url) {
+  function newsItemHTML(title, source, date, url, tier) {
     const src      = (source||'UNKNOWN').replace(/\./g,'-').slice(0,20);
-    const srcClass = ['BBC','Guardian','NYT','Reuters','Al-Jazeera','Al Jazeera','FP'].includes(src)
-      ? src.replace(/\s+/g,'-') : 'default';
-    const ago  = timeAgo(date);
-    const link = url ? `href="${url}" target="_blank" rel="noopener"` : '';
+    const srcClass = src.replace(/\s+/g,'-');
+    const ago      = timeAgo(date);
+    const link     = url ? `href="${url}" target="_blank" rel="noopener"` : '';
+
+    // Infer trust tier from source name if not passed
+    const trust    = typeof tier === 'number' ? tier : getSourceTrust(source).level;
+    const trustInfo = trust === 1 ? { css:'trust-t1', lbl:'WIRE' }
+                    : trust === 2 ? { css:'trust-t2', lbl:'VERIFIED' }
+                    : trust === 3 ? { css:'trust-t3', lbl:'REPORTED' }
+                    :               { css:'trust-social', lbl:'UNVERIFIED' };
+
     return `
       <a class="news-item" ${link} style="text-decoration:none;display:block;">
         <div class="ni-header">
-          <span class="ni-source ${srcClass}">${escHtml((source||'').slice(0,14))}</span>
+          <span class="trust-badge ${trustInfo.css}">${trustInfo.lbl}</span>
+          <span class="ni-source ${srcClass}">${escHtml((source||'').slice(0,16))}</span>
           ${ago ? `<span class="ni-date">${ago}</span>` : ''}
         </div>
         <div class="ni-title">${escHtml(title)}</div>
@@ -638,9 +757,12 @@ const App = (() => {
     const tape = document.getElementById('ticker-tape');
     if (!tape || !items.length) return;
 
-    const duped = [...items, ...items];
+    // Only tier 1–3 in ticker, not social media
+    const filtered = items.filter(i => (i.tier || 3) <= 3);
+    const duped = [...filtered, ...filtered];
     tape.innerHTML = duped.map(item => {
-      const src = (item.source||'').replace(/\s+/g,'-');
+      const src   = (item.source||'').replace(/\s+/g,'-');
+      const trust = item.tier === 1 ? 'trust-t1' : item.tier === 2 ? 'trust-t2' : 'trust-t3';
       return `<span class="ticker-item">
         <span class="ticker-source ni-source ${src}">${escHtml(item.source||'')}</span>
         <span class="ticker-title">${escHtml(item.title||'')}</span>

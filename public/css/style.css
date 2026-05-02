@@ -632,13 +632,25 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   text-transform: uppercase;
   flex-shrink: 0;
 }
-.ni-source.BBC      { background: rgba(187,0,0,0.2);   border: 1px solid rgba(187,0,0,0.4);   color: #ff6666; }
-.ni-source.Guardian { background: rgba(0,100,50,0.2);  border: 1px solid rgba(0,150,60,0.4);  color: #44cc88; }
-.ni-source.NYT      { background: rgba(0,0,0,0.3);     border: 1px solid rgba(100,100,100,0.4); color: #aaa; }
-.ni-source.Reuters  { background: rgba(200,140,0,0.2); border: 1px solid rgba(200,140,0,0.4); color: #ffcc44; }
-.ni-source.Al-Jazeera, .ni-source.AlJazeera { background: rgba(0,80,150,0.2); border: 1px solid rgba(0,120,200,0.4); color: #44aaff; }
-.ni-source.FP       { background: rgba(80,0,120,0.2);  border: 1px solid rgba(120,0,180,0.4); color: #cc88ff; }
-.ni-source.default  { background: rgba(60,80,100,0.2); border: 1px solid rgba(60,80,100,0.4); color: var(--text-dim); }
+/* Tier 1 — Wire (gold) */
+.ni-source.Reuters        { background: rgba(200,140,0,0.2);  border: 1px solid rgba(200,140,0,0.5);  color: #ffcc44; }
+.ni-source.AP             { background: rgba(180,60,0,0.2);   border: 1px solid rgba(200,80,0,0.5);   color: #ff9944; }
+/* Tier 2 — Major journalism */
+.ni-source.BBC            { background: rgba(187,0,0,0.2);    border: 1px solid rgba(187,0,0,0.4);    color: #ff6666; }
+.ni-source.Guardian       { background: rgba(0,100,50,0.2);   border: 1px solid rgba(0,150,60,0.4);   color: #44cc88; }
+.ni-source.NYT            { background: rgba(30,30,30,0.3);   border: 1px solid rgba(100,100,100,0.4);color: #aaaaaa; }
+.ni-source.Washington-Post{ background: rgba(0,60,120,0.2);   border: 1px solid rgba(0,80,160,0.4);   color: #5588ff; }
+.ni-source.Financial-Times{ background: rgba(200,60,0,0.2);   border: 1px solid rgba(220,80,0,0.4);   color: #ff8844; }
+/* Tier 3 — Regional / Specialty */
+.ni-source.Al-Jazeera,
+.ni-source.Al-Jazeera-English { background: rgba(0,80,150,0.2);  border: 1px solid rgba(0,120,200,0.4);  color: #44aaff; }
+.ni-source.Deutsche-Welle { background: rgba(0,80,40,0.2);    border: 1px solid rgba(0,120,60,0.4);   color: #44bb66; }
+.ni-source.France-24      { background: rgba(0,40,120,0.2);   border: 1px solid rgba(0,60,160,0.4);   color: #3399ff; }
+.ni-source.RFE-RL         { background: rgba(100,0,100,0.2);  border: 1px solid rgba(140,0,140,0.4);  color: #dd44dd; }
+.ni-source.Foreign-Policy { background: rgba(80,0,120,0.2);   border: 1px solid rgba(120,0,180,0.4);  color: #cc88ff; }
+.ni-source.Bellingcat     { background: rgba(20,80,80,0.2);   border: 1px solid rgba(30,120,120,0.4); color: #44cccc; }
+.ni-source.Foreign-Affairs{ background: rgba(60,30,90,0.2);   border: 1px solid rgba(90,40,130,0.4);  color: #bb88ee; }
+.ni-source.default        { background: rgba(60,80,100,0.2);  border: 1px solid rgba(60,80,100,0.4);  color: var(--text-dim); }
 
 .ni-date {
   font-family: var(--mono);
@@ -1362,9 +1374,175 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 .cmp-winner { background: rgba(0,180,255,0.05); }
 
-/* ── RESPONSIVE TOUCH ────────────────────────────────────── */
+/* ── TRUST BADGES ────────────────────────────────────────────── */
+.trust-badge {
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.8px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-weight: bold;
+  border: 1px solid;
+}
+.trust-t1    { background: rgba(0,120,200,0.2);   border-color: rgba(0,120,200,0.5);   color: #44aaff; }
+.trust-t2    { background: rgba(0,160,80,0.2);    border-color: rgba(0,160,80,0.4);    color: #44ee88; }
+.trust-t3    { background: rgba(100,100,180,0.2); border-color: rgba(100,100,180,0.4); color: #aab0ff; }
+.trust-social{ background: rgba(255,140,0,0.2);   border-color: rgba(255,140,0,0.45);  color: #ffaa44; }
+
+/* ── SOCIAL MEDIA SECTION ────────────────────────────────────── */
+.social-disclaimer-header {
+  padding: 8px 14px;
+  font-size: 10px;
+  color: #ffaa44;
+  background: rgba(255,140,0,0.07);
+  border-bottom: 1px solid rgba(255,140,0,0.2);
+  line-height: 1.5;
+}
+.social-disclaimer-header strong { color: #ffcc66; }
+.social-item { border-left: 2px solid rgba(255,140,0,0.4) !important; }
+.social-disclaimer {
+  font-size: 9px;
+  color: rgba(255,140,0,0.7);
+  font-style: italic;
+  margin-top: 3px;
+  font-family: var(--mono);
+}
+.social-src {
+  background: rgba(255,140,0,0.15);
+  border: 1px solid rgba(255,140,0,0.3);
+  color: #ffaa44;
+}
+
+/* ── AIR ACCESS BADGES ───────────────────────────────────────── */
+.air-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: bold;
+  margin-right: 6px;
+  border: 1px solid;
+  text-transform: uppercase;
+}
+.air-open       { background: rgba(10,92,46,0.3);   border-color: #0a5c2e; color: #44ee88; }
+.air-limited    { background: rgba(180,160,32,0.2); border-color: #b4a020; color: #ffdd44; }
+.air-restricted { background: rgba(196,76,0,0.25);  border-color: #c44c00; color: #ff8844; }
+.air-charter    { background: rgba(148,16,0,0.2);   border-color: #941000; color: #ff5533; }
+.air-closed     { background: rgba(94,0,0,0.35);    border-color: #5e0000; color: #ff2222; }
+.air-hubs {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+/* ── RESPONSIVE — TABLET ─────────────────────────────────────── */
 @media (max-width: 900px) {
   :root { --panel-w: 280px; }
   .stat-block { padding: 0 8px; }
   #header-stats .stat-divider { display: none; }
+}
+
+/* ── RESPONSIVE — MOBILE (≤768px) ───────────────────────────── */
+.mobile-panel-btn { display: none; }
+
+@media (max-width: 768px) {
+  :root { --panel-w: 100vw; --header-h: 48px; --ticker-h: 32px; }
+
+  #header { padding: 0 10px; gap: 8px; }
+  .logo-text { font-size: 12px; letter-spacing: 1px; }
+  .logo-tag  { display: none; }
+  #header-stats { display: none; }
+  #clock { font-size: 12px; }
+  #date-display { display: none; }
+
+  #main { flex-direction: column; }
+  #map-wrapper { flex: 1; width: 100%; }
+
+  /* Panel slides up from bottom */
+  #intel-panel {
+    position: fixed;
+    bottom: var(--ticker-h);
+    left: 0; right: 0;
+    height: 0;
+    overflow: hidden;
+    border-left: none;
+    border-top: 2px solid var(--border-bright);
+    transition: height 0.35s cubic-bezier(0.4,0,0.2,1);
+    z-index: 200;
+  }
+  #intel-panel.mobile-open { height: 65vh; }
+
+  /* Floating toggle button */
+  .mobile-panel-btn {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    bottom: calc(var(--ticker-h) + 12px);
+    right: 12px;
+    z-index: 190;
+    background: rgba(4,12,26,0.92);
+    border: 1px solid var(--border-bright);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    padding: 8px 14px;
+    border-radius: 20px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
+  #map-controls { bottom: calc(var(--ticker-h) + 60px); right: 12px; }
+  .map-btn { width: 36px; height: 36px; font-size: 20px; }
+
+  #search-bar { width: calc(100% - 24px); left: 12px; transform: none; top: 10px; }
+
+  #region-bar {
+    top: 56px; left: 6px; right: 6px;
+    transform: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+  }
+  .region-label { display: none; }
+  .region-btn { white-space: nowrap; font-size: 10px; padding: 5px 10px; flex-shrink: 0; }
+
+  #legend {
+    bottom: calc(var(--ticker-h) + 8px);
+    left: 8px;
+    padding: 8px 10px;
+    min-width: 110px;
+  }
+  .legend-title { font-size: 7px; }
+  .legend-item  { font-size: 8px; }
+  #timeline-block { display: none; }
+  #event-types-legend { display: none; }
+
+  .ticker-live-text { font-size: 9px; letter-spacing: 1px; }
+  #ticker-tape { font-size: 10px; }
+
+  .ptab { padding: 12px 4px; font-size: 9px; letter-spacing: 0.3px; }
+  .ni-title { font-size: 12px; -webkit-line-clamp: 3; }
+  .ec-info  { -webkit-line-clamp: 3; font-size: 12px; }
+  .ec-name  { font-size: 13px; }
+}
+
+/* ── RESPONSIVE — PHONE PORTRAIT (≤480px) ───────────────────── */
+@media (max-width: 480px) {
+  :root { --header-h: 44px; }
+  .logo-text { font-size: 11px; }
+  #intel-panel.mobile-open { height: 70vh; }
+  .ec-severity { display: none; }
+  #tr-sections .tr-section { padding: 8px 12px; }
+  .tr-section-body { font-size: 12px; line-height: 1.55; }
+  .cmp-metric-label { width: 60px; font-size: 7px; }
 }

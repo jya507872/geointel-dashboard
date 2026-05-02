@@ -167,6 +167,8 @@ const MAJOR_EVENTS = [
     location: "Ukraine / Russia",
     info: "Russia's full-scale invasion launched February 2022. Active frontlines in Donetsk, Zaporizhzhia, Kherson, Kharkiv. Drone/missile strikes on Ukrainian cities. Europe's largest war since 1945.",
     started: "Feb 2022",
+    confidence: "HIGH",
+    sources: ["Reuters","AP","BBC","NYT"],
   },
   {
     id: "gaza",
@@ -399,6 +401,87 @@ const MAJOR_EVENTS = [
     started: "Dec 2023 (new phase)",
   },
 ];
+
+// ── AIR ACCESS DATA ────────────────────────────────────────────
+// tier: 'open' | 'limited' | 'restricted' | 'charter' | 'closed'
+const AIR_ACCESS = {
+  "4":   { tier:"closed",      label:"CLOSED",      note:"No scheduled commercial service. Charter only via Kabul (KBL). Kam Air & Ariana Afghan domestic only.", hubs:[] },
+  "804": { tier:"restricted",  label:"RESTRICTED",  note:"Kyiv Boryspil (KBP) & Lviv (LWO) operational. EU carrier suspensions in place. Wizz Air, LOT serve Lviv. Check airspace NOTAMs.", hubs:["KBP","LWO"] },
+  "887": { tier:"closed",      label:"CLOSED",      note:"No Western carriers. Aden/Sana'a minimal service via Yemenia, flydubai. Route via Dubai (DXB) or Amman (AMM).", hubs:[] },
+  "729": { tier:"closed",      label:"CLOSED",      note:"Khartoum airport destroyed. No scheduled service. Charter via N'Djamena (Chad) or Cairo (Egypt).", hubs:[] },
+  "104": { tier:"restricted",  label:"RESTRICTED",  note:"Yangon (RGN) open, many carriers suspended. Thai Airways, AirAsia, MAI operate limited routes. Conflict zones: charter only.", hubs:["RGN"] },
+  "706": { tier:"charter",     label:"CHARTER ZONE",note:"Mogadishu (MGQ): Turkish Airlines, flydubai, Kenya Airways. High-risk environment. Mandatory security briefing.", hubs:["MGQ"] },
+  "275": { tier:"restricted",  label:"RESTRICTED",  note:"Ben Gurion (TLV) open but some carriers suspended. Gaza: no civil aviation. Situation volatile — check before booking.", hubs:["TLV"] },
+  "180": { tier:"limited",     label:"LIMITED",     note:"Kinshasa (FIH): Ethiopian, Kenya Airways, Air France. Eastern DRC (Goma/Bukavu): UNHAS/NGO charter only.", hubs:["FIH"] },
+  "434": { tier:"restricted",  label:"RESTRICTED",  note:"Tripoli Mitiga (MJI): Turkish Airlines, Libyan Wings. Rival factions control different airports. Pre-travel airspace check required.", hubs:["MJI"] },
+  "140": { tier:"charter",     label:"CHARTER ZONE",note:"Bangui (BGF): Ethiopian Airlines. Upcountry: UN/NGO charter only. Msafiri and charter operators.", hubs:["BGF"] },
+  "466": { tier:"restricted",  label:"RESTRICTED",  note:"Bamako (BKO): Turkish Airlines, Royal Air Maroc, ASKY. Upcountry: charter or military escort required.", hubs:["BKO"] },
+  "332": { tier:"limited",     label:"LIMITED",     note:"Port-au-Prince (PAP): American, JetBlue, Air Canada, Copa. Gang activity near airport perimeter.", hubs:["PAP"] },
+  "562": { tier:"limited",     label:"LIMITED",     note:"Niamey (NIM): Ethiopian, Royal Air Maroc. Air France suspended. US/French military flights halted.", hubs:["NIM"] },
+  "854": { tier:"limited",     label:"LIMITED",     note:"Ouagadougou (OUA): Ethiopian, Air Côte d'Ivoire, ASKY. Several carriers suspended post-coup.", hubs:["OUA"] },
+  "728": { tier:"limited",     label:"LIMITED",     note:"Juba (JUB): Ethiopian, Kenya Airways, flydubai. Upcountry: WFP/UNHAS charter essential.", hubs:["JUB"] },
+  "760": { tier:"limited",     label:"LIMITED",     note:"Damascus (DAM): Limited service resuming post-Assad. Gulf carriers exploring routes. Situation evolving.", hubs:["DAM"] },
+  "108": { tier:"limited",     label:"LIMITED",     note:"Bujumbura (BJM): Ethiopian, RwandAir, Kenya Airways. Operational but limited schedule.", hubs:["BJM"] },
+  "408": { tier:"closed",      label:"CLOSED",      note:"No commercial access. Air Koryo (Pyongyang/FNJ) minimal service to Beijing only. Government invitation required.", hubs:[] },
+  "862": { tier:"limited",     label:"LIMITED",     note:"Caracas (CCS): American (suspended), Conviasa, Copa. Connect via Bogotá (BOG) or Panama City (PTY).", hubs:["CCS"] },
+  "364": { tier:"limited",     label:"LIMITED",     note:"Tehran (IKA): Mahan Air, Qatar Airways, Turkish Airlines. Western carriers absent due to sanctions.", hubs:["IKA"] },
+  "422": { tier:"limited",     label:"LIMITED",     note:"Beirut (BEY): MEA, Air France, Turkish Airlines. Israeli strikes caused temporary closures — monitor advisories.", hubs:["BEY"] },
+  "368": { tier:"limited",     label:"LIMITED",     note:"Baghdad (BGW) and Erbil (EBL). Turkish Airlines, flydubai, Iraqi Airways. Erbil is safer gateway to north.", hubs:["BGW","EBL"] },
+  "643": { tier:"restricted",  label:"RESTRICTED",  note:"Moscow Sheremetyevo (SVO): EU/US carriers absent. Turkish Airlines, Emirates, Etihad, Aeroflot serve. Significant rerouting.", hubs:["SVO"] },
+  "218": { tier:"limited",     label:"LIMITED",     note:"Quito (UIO) & Guayaquil (GYE): well-served. Security elevated but airports fully operational.", hubs:["UIO","GYE"] },
+  "231": { tier:"limited",     label:"LIMITED",     note:"Addis Ababa Bole (ADD): major African hub. Ethiopian Airlines global network. Conflict zones: charter only.", hubs:["ADD"] },
+  "566": { tier:"limited",     label:"LIMITED",     note:"Lagos (LOS) & Abuja (ABV): well-served. Northeast Nigeria (Maiduguri): local carriers & charter.", hubs:["LOS","ABV"] },
+  "116": { tier:"open",        label:"OPEN",        note:"Phnom Penh (PNH) & Siem Reap (SAI): major Asian carriers. Easy access, no restrictions.", hubs:["PNH"] },
+  "484": { tier:"open",        label:"OPEN",        note:"Mexico City (MEX), Cancún (CUN): major international hubs. Extensive domestic network.", hubs:["MEX","CUN"] },
+  "36":  { tier:"open",        label:"OPEN",        note:"Sydney (SYD), Melbourne (MEL), Brisbane (BNE): excellent global connectivity.", hubs:["SYD","MEL"] },
+  "276": { tier:"open",        label:"OPEN",        note:"Frankfurt (FRA) & Munich (MUC): major European hubs, Lufthansa home base.", hubs:["FRA","MUC"] },
+  "840": { tier:"open",        label:"OPEN",        note:"JFK, LAX, ORD, ATL among world's busiest. Comprehensive global coverage.", hubs:["JFK","LAX"] },
+  "826": { tier:"open",        label:"OPEN",        note:"London Heathrow (LHR): world's busiest international hub. British Airways home base.", hubs:["LHR"] },
+  "250": { tier:"open",        label:"OPEN",        note:"Paris CDG: major European hub. Air France home base, extensive long-haul network.", hubs:["CDG"] },
+  "784": { tier:"open",        label:"OPEN",        note:"Dubai (DXB): world's busiest by int'l passengers. Emirates home hub. Exceptional global reach.", hubs:["DXB"] },
+  "634": { tier:"open",        label:"OPEN",        note:"Doha (DOH): Qatar Airways hub. One of the world's best-connected airports.", hubs:["DOH"] },
+  "392": { tier:"open",        label:"OPEN",        note:"Tokyo Narita (NRT) & Haneda (HND): major Asia-Pacific hubs. ANA & JAL home base.", hubs:["NRT","HND"] },
+};
+
+function getAirAccess(countryId) {
+  return AIR_ACCESS[String(countryId)] || { tier:"open", label:"OPEN", note:"Standard commercial service available. Check latest advisories.", hubs:[] };
+}
+
+// ── SOURCE TRUST TIERS ─────────────────────────────────────────
+const SOURCE_TRUST = {
+  // Wire services — primary-sourcing, highest reliability
+  TIER1: {
+    level: 1, label: "WIRE", css: "trust-t1",
+    orgs: ['Reuters','AP','AFP','Associated Press','Agence France-Presse']
+  },
+  // Major established international journalism
+  TIER2: {
+    level: 2, label: "VERIFIED", css: "trust-t2",
+    orgs: ['BBC','Guardian','NYT','Washington Post','Financial Times','Der Spiegel',
+           'The Economist','Le Monde','Wall Street Journal','WSJ','Bloomberg','Time']
+  },
+  // Quality regional & specialty journalism
+  TIER3: {
+    level: 3, label: "REPORTED", css: "trust-t3",
+    orgs: ['Al Jazeera','Deutsche Welle','DW','France 24','NHK World','Radio Free Europe',
+           'RFE/RL','Bellingcat','Foreign Policy','FP','Politico','The Atlantic',
+           'Middle East Eye','Dawn','The Hindu','Haaretz','L\'Orient Today']
+  },
+  // Social / unverified — needs cross-check
+  SOCIAL: {
+    level: 4, label: "UNVERIFIED", css: "trust-social",
+    orgs: ['Reddit','Twitter','Telegram','TikTok','X']
+  },
+};
+
+function getSourceTrust(sourceName) {
+  const s = (sourceName || '').trim();
+  for (const tier of [SOURCE_TRUST.TIER1, SOURCE_TRUST.TIER2, SOURCE_TRUST.TIER3]) {
+    if (tier.orgs.some(o => s.toLowerCase().includes(o.toLowerCase()))) return tier;
+  }
+  if (SOURCE_TRUST.SOCIAL.orgs.some(o => s.toLowerCase().includes(o.toLowerCase()))) return SOURCE_TRUST.SOCIAL;
+  return SOURCE_TRUST.TIER3; // default: assume reported, unlabeled
+}
 
 // ── HELPER FUNCTIONS ───────────────────────────────────────────
 function getFlag(alpha2) {

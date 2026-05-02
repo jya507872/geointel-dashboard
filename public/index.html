@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#040c1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Real-time geopolitical intelligence dashboard — world conflict map, threat levels, travel safety, live intel feed.">
   <title>GEOPOLITICAL INTELLIGENCE DASHBOARD</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◈</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,9 +183,21 @@
 
         <div class="panel-section-title">
           <span class="section-icon">◉</span> LATEST INTELLIGENCE
-          <span id="gdelt-badge" class="source-badge">GDELT</span>
+          <span id="gdelt-badge" class="source-badge">GDELT · MULTI-SOURCE</span>
         </div>
         <div id="gdelt-list"></div>
+
+        <!-- Social media layer — hidden until data arrives -->
+        <div id="social-section" class="hidden">
+          <div class="panel-section-title">
+            <span class="section-icon" style="color:#ffaa00">⚠</span> SOCIAL MEDIA SIGNALS
+            <span class="source-badge" style="background:rgba(255,170,0,0.15);border-color:rgba(255,170,0,0.4);color:#ffaa00">UNVERIFIED</span>
+          </div>
+          <div class="social-disclaimer-header">
+            Signals from r/worldnews & r/geopolitics. <strong>Not confirmed by editorial sources.</strong> Cross-check before treating as fact.
+          </div>
+          <div id="social-feed"></div>
+        </div>
       </div>
 
       <!-- ── COUNTRY TAB ─────────────────────────────────────── -->
@@ -313,6 +329,9 @@
       <div id="ticker-tape"></div>
     </div>
   </footer>
+
+  <!-- Mobile panel toggle button (hidden on desktop) -->
+  <button id="mobile-panel-toggle" class="mobile-panel-btn" aria-label="Toggle Intel Panel">◈ INTEL</button>
 
   <!-- Scripts -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
