@@ -1440,6 +1440,174 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   opacity: 0.8;
 }
 
+/* ── TRAVEL ORIGIN FIELD ─────────────────────────────────────── */
+.travel-label-opt {
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  font-weight: normal;
+  opacity: 0.75;
+}
+#travel-origin-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color .2s;
+}
+#travel-origin-input:focus { border-color: var(--accent); }
+#travel-origin-input::placeholder { color: var(--text-dim); }
+.action-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.action-btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── AIRLINE CARDS ───────────────────────────────────────────── */
+.airline-block {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,180,255,0.1);
+}
+.airline-section-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+.airline-origin-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  font-style: italic;
+}
+.airline-cards { display: flex; flex-direction: column; gap: 5px; }
+.airline-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(0,180,255,0.05);
+  border: 1px solid rgba(0,180,255,0.12);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background .2s, border-color .2s;
+  cursor: pointer;
+}
+.airline-card:hover {
+  background: rgba(0,180,255,0.12);
+  border-color: rgba(0,180,255,0.35);
+}
+.airline-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--accent);
+  background: rgba(0,180,255,0.12);
+  border: 1px solid rgba(0,180,255,0.25);
+  border-radius: 3px;
+  padding: 2px 5px;
+  min-width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.airline-info { flex: 1; min-width: 0; }
+.airline-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.airline-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.airline-book {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--accent);
+  opacity: 0.7;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  transition: opacity .2s;
+}
+.airline-card:hover .airline-book { opacity: 1; }
+
+/* ── INSURANCE LINKS ─────────────────────────────────────────── */
+.insurance-block {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,180,255,0.1);
+}
+.insurance-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: #44ee88;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+.insurance-urgency {
+  font-size: 10px;
+  color: #ffdd44;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  background: rgba(255,221,68,0.08);
+  border-left: 2px solid #ffdd44;
+  border-radius: 2px;
+}
+.insurance-links { display: flex; flex-direction: column; gap: 5px; }
+.insurance-link {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(68,238,136,0.04);
+  border: 1px solid rgba(68,238,136,0.15);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background .2s, border-color .2s;
+}
+.insurance-link:hover {
+  background: rgba(68,238,136,0.10);
+  border-color: rgba(68,238,136,0.35);
+}
+.insurance-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #44ee88;
+  flex-shrink: 0;
+}
+.insurance-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── RESPONSIVE — TABLET ─────────────────────────────────────── */
 @media (max-width: 900px) {
   :root { --panel-w: 280px; }

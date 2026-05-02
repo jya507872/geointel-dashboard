@@ -45,6 +45,8 @@ const App = (() => {
   let lastTickerTs  = null;
   let currentCountry = null;
   let compareA = null, compareB = null;
+  let travelOriginId    = null;   // numeric ISO id of "flying from" country
+  let travelOriginAlpha2 = null;  // alpha2 for insurance lookup
 
   // ── HISTORICAL GPI RISK DATA (approx. per year, selected countries) ──
   // Format: { iso: [risk2008, risk2009, ..., risk2024] } — 17 values
@@ -233,11 +235,15 @@ const App = (() => {
 
   // ── TRAVEL CHECKER ────────────────────────────────────────────
   function initTravel() {
-    const input    = document.getElementById('travel-input');
-    const btn      = document.getElementById('travel-check-btn');
-    const sugg     = document.getElementById('travel-suggestions');
-    const allC     = Object.entries(COUNTRY_DATA).map(([id,d]) => ({id,...d}));
+    const input      = document.getElementById('travel-input');
+    const btn        = document.getElementById('travel-check-btn');
+    const sugg       = document.getElementById('travel-suggestions');
+    const originInput= document.getElementById('travel-origin-input');
+    const originSugg = document.getElementById('travel-origin-suggestions');
+    const originClear= document.getElementById('travel-origin-clear');
+    const allC       = Object.entries(COUNTRY_DATA).map(([id,d]) => ({id,...d}));
 
+    // ── Destination autocomplete ──────────────────────────────────
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase();
       if (!q) { sugg.classList.add('hidden'); return; }
@@ -259,12 +265,57 @@ const App = (() => {
       });
     });
 
+    // ── Origin autocomplete ───────────────────────────────────────
+    function renderOriginSugg(q) {
+      if (!q) { originSugg.classList.add('hidden'); return; }
+      const m = allC.filter(c => c.name.toLowerCase().startsWith(q)).slice(0,5);
+      originSugg.innerHTML = m.map(c => `
+        <div class="search-result-item" data-id="${c.id}" data-name="${escHtml(c.name)}" data-alpha2="${c.alpha2||''}">
+          <span class="sri-flag">${getFlag(c.alpha2)}</span>
+          <div class="sri-info">
+            <div class="sri-name">${escHtml(c.name)}</div>
+            <div class="sri-region">${escHtml(c.region||'')}</div>
+          </div>
+        </div>`).join('');
+      originSugg.classList.toggle('hidden', !m.length);
+      originSugg.querySelectorAll('.search-result-item').forEach(el => {
+        el.addEventListener('click', () => {
+          originInput.value      = el.dataset.name;
+          travelOriginId         = el.dataset.id;
+          travelOriginAlpha2     = el.dataset.alpha2;
+          originSugg.classList.add('hidden');
+          originClear.classList.remove('hidden');
+        });
+      });
+    }
+
+    originInput.addEventListener('input', () => {
+      const q = originInput.value.trim().toLowerCase();
+      if (!q) {
+        travelOriginId = null; travelOriginAlpha2 = null;
+        originClear.classList.add('hidden');
+      }
+      renderOriginSugg(q);
+    });
+
+    originClear.addEventListener('click', () => {
+      originInput.value      = '';
+      travelOriginId         = null;
+      travelOriginAlpha2     = null;
+      originClear.classList.add('hidden');
+      originSugg.classList.add('hidden');
+    });
+
     document.addEventListener('click', e => {
-      if (!e.target.closest('.travel-form')) sugg.classList.add('hidden');
+      if (!e.target.closest('.travel-form')) {
+        sugg.classList.add('hidden');
+        originSugg.classList.add('hidden');
+      }
     });
 
     btn.addEventListener('click', () => renderTravelBrief(input.value.trim()));
     input.addEventListener('keydown', e => { if (e.key === 'Enter') renderTravelBrief(input.value.trim()); });
+    originInput.addEventListener('keydown', e => { if (e.key === 'Enter') { originSugg.classList.add('hidden'); renderTravelBrief(input.value.trim()); } });
   }
 
   function renderTravelBrief(query) {
@@ -298,7 +349,7 @@ const App = (() => {
 
     const v = verdicts[Math.min(risk, 10)];
 
-    const travelTips = getTravelTips(data, country.id);
+    const travelTips = getTravelTips(data, country.id, travelOriginId, travelOriginAlpha2);
 
     document.getElementById('tr-flag').textContent = getFlag(data.alpha2);
     document.getElementById('tr-country-name').textContent = data.name;
@@ -315,7 +366,7 @@ const App = (() => {
     document.getElementById('travel-result').classList.remove('hidden');
   }
 
-  function getTravelTips(data, countryId) {
+  function getTravelTips(data, countryId, originId, originAlpha2) {
     const risk = data.risk;
     const tags = data.tags || [];
     const air  = getAirAccess(countryId);
@@ -337,28 +388,30 @@ const App = (() => {
       ? 'Political unrest possible. Avoid demonstrations. Situation can change rapidly.'
       : 'Politically stable. Monitor news.';
 
-    const health = risk <= 3 ? 'Good healthcare infrastructure. Travel insurance recommended.' :
-      risk <= 6 ? 'Healthcare may be limited outside capital. Travel insurance essential.' :
+    const healthBase = risk <= 3 ? 'Good healthcare infrastructure.' :
+      risk <= 6 ? 'Healthcare may be limited outside capital.' :
       'Healthcare severely limited. Bring medical supplies. Evacuation insurance critical.';
 
     const connectivity = tags.some(t => ['authoritarian','isolated'].includes(t))
       ? 'Internet may be restricted. VPN recommended. Inform contacts of your itinerary.'
       : 'Mobile coverage generally available in urban areas.';
 
-    const airTierColors = { open:'#44ee88', limited:'#ffdd44', restricted:'#ff8844', charter:'#ff6622', closed:'#ff3333' };
-    const airColor = airTierColors[air.tier] || '#aaa';
-    const airBody  = `<span class="air-badge air-${air.tier}">${air.label}</span> ${air.note}${
+    const airBody = `<span class="air-badge air-${air.tier}">${air.label}</span> ${escHtml(air.note)}${
       air.hubs.length ? ` <span class="air-hubs">Hub codes: ${air.hubs.join(' · ')}</span>` : ''
     }`;
 
+    const airlinesHtml    = buildAirlinesHTML(countryId, data.region, originId);
+    const insuranceHtml   = buildInsuranceHTML(originAlpha2, risk);
+    const healthBody      = healthBase + ' Travel insurance essential.' + insuranceHtml;
+
     const sections = [
-      { icon: '🛡️', title: 'OVERALL SAFETY',   body: `${safetyLevel} risk. ${data.info}` },
-      { icon: '✈',  title: 'FLIGHT ACCESS',    body: airBody, isHtml: true },
-      { icon: '🔫', title: 'CRIME & VIOLENCE',  body: crimeRisk },
-      { icon: '💥', title: 'TERRORISM',         body: terrorRisk },
-      { icon: '🏛️', title: 'POLITICAL CLIMATE', body: politicalRisk },
-      { icon: '🏥', title: 'HEALTH & MEDICAL',  body: health },
-      { icon: '📡', title: 'COMMUNICATIONS',    body: connectivity },
+      { icon: '🛡️', title: 'OVERALL SAFETY',    body: `${safetyLevel} risk. ${escHtml(data.info)}`, isHtml: true },
+      { icon: '✈',  title: 'AIRLINES & ACCESS',  body: airBody + airlinesHtml, isHtml: true },
+      { icon: '🔫', title: 'CRIME & VIOLENCE',   body: escHtml(crimeRisk), isHtml: true },
+      { icon: '💥', title: 'TERRORISM',          body: escHtml(terrorRisk), isHtml: true },
+      { icon: '🏛️', title: 'POLITICAL CLIMATE',  body: escHtml(politicalRisk), isHtml: true },
+      { icon: '🏥', title: 'HEALTH & INSURANCE', body: healthBody, isHtml: true },
+      { icon: '📡', title: 'COMMUNICATIONS',     body: escHtml(connectivity), isHtml: true },
     ];
 
     return sections.map(s => `
@@ -366,8 +419,96 @@ const App = (() => {
         <div class="tr-section-title">
           <span class="tr-section-icon">${s.icon}</span> ${s.title}
         </div>
-        <div class="tr-section-body">${s.isHtml ? s.body : escHtml(s.body)}</div>
+        <div class="tr-section-body">${s.body}</div>
       </div>`).join('');
+  }
+
+  // ── AIRLINE CARDS ─────────────────────────────────────────────
+  function buildAirlinesHTML(destCountryId, destRegion, originId) {
+    const national    = getCarriersByCountryId(destCountryId);
+    const regional    = REGION_HUBS[destRegion] || [];
+
+    // De-duplicate by code across all lists
+    const seen   = new Set();
+    const unique = (arr) => arr.filter(a => { if (seen.has(a.code)) return false; seen.add(a.code); return true; });
+
+    let primary   = unique(national);
+    let secondary = unique(regional);
+    let universal = unique(UNIVERSAL_CONNECTORS);
+
+    // If origin specified, find that country's region carriers too (for route hints)
+    let originRegionalNote = '';
+    if (originId) {
+      const originData = COUNTRY_DATA[String(originId)];
+      if (originData) {
+        const originRegion = originData.region || '';
+        const originCarriers = getCarriersByCountryId(originId);
+        const extraOrigin    = unique(originCarriers);
+        if (extraOrigin.length) {
+          // Prepend origin's national carriers as "likely best route"
+          primary = unique([...extraOrigin, ...primary]);
+          originRegionalNote = `<div class="airline-origin-note">Route carriers from <strong>${escHtml(originData.name)}</strong> highlighted first</div>`;
+        }
+      }
+    }
+
+    // Build card HTML for a carrier list
+    const buildCards = (carriers) => carriers.map(c => `
+      <a class="airline-card" href="${escHtml(c.url)}" target="_blank" rel="noopener">
+        <span class="airline-code">${escHtml(c.code)}</span>
+        <div class="airline-info">
+          <div class="airline-name">${escHtml(c.name)}</div>
+          ${c.note ? `<div class="airline-note">${escHtml(c.note)}</div>` : ''}
+        </div>
+        <span class="airline-book">BOOK →</span>
+      </a>`).join('');
+
+    let html = '';
+
+    if (primary.length) {
+      html += `<div class="airline-section-label">${originId ? 'RECOMMENDED AIRLINES' : 'NATIONAL & MAJOR CARRIERS'}</div>`;
+      if (originRegionalNote) html += originRegionalNote;
+      html += `<div class="airline-cards">${buildCards(primary)}</div>`;
+    }
+
+    if (secondary.length) {
+      html += `<div class="airline-section-label" style="margin-top:10px">REGIONAL HUB CARRIERS</div>`;
+      html += `<div class="airline-cards">${buildCards(secondary)}</div>`;
+    }
+
+    if (!primary.length && !secondary.length && universal.length) {
+      html += `<div class="airline-section-label">GLOBAL CONNECTORS</div>`;
+      html += `<div class="airline-cards">${buildCards(universal)}</div>`;
+    } else if (universal.length) {
+      html += `<div class="airline-section-label" style="margin-top:10px">GLOBAL CONNECTORS</div>`;
+      html += `<div class="airline-cards">${buildCards(universal)}</div>`;
+    }
+
+    return html ? `<div class="airline-block">${html}</div>` : '';
+  }
+
+  // ── INSURANCE LINKS ───────────────────────────────────────────
+  function buildInsuranceHTML(originAlpha2, destRisk) {
+    const providers = getInsuranceByAlpha2(originAlpha2);
+    if (!providers.length) return '';
+
+    const urgencyNote = destRisk >= 7
+      ? '<div class="insurance-urgency">⚠ High-risk destination — <strong>comprehensive medical evacuation coverage essential</strong></div>'
+      : destRisk >= 5
+      ? '<div class="insurance-urgency">Consider a plan with medical evacuation and trip cancellation cover.</div>'
+      : '';
+
+    const links = providers.map(p => `
+      <a class="insurance-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
+        <span class="insurance-name">${escHtml(p.name)}</span>
+        ${p.note ? `<span class="insurance-note">${escHtml(p.note)}</span>` : ''}
+      </a>`).join('');
+
+    return `<div class="insurance-block">
+      <div class="insurance-label">RECOMMENDED TRAVEL INSURANCE${originAlpha2 ? '' : ' (GLOBAL)'}</div>
+      ${urgencyNote}
+      <div class="insurance-links">${links}</div>
+    </div>`;
   }
 
   // ── COMPARE ───────────────────────────────────────────────────
