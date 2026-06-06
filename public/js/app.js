@@ -248,11 +248,21 @@ const App = (() => {
     const yearEl = document.getElementById('timeline-year');
     const noteEl = document.getElementById('timeline-note');
 
+    // The far-right notch is "NOW" (live current assessment); positions to the
+    // left are historical GPI years. GPI data runs through 2024, so the sentinel
+    // value 2025 = live/now (its label never shows a stale year number).
+    const NOW = parseInt(slider.max); // 2025 sentinel
+
     slider.addEventListener('input', () => {
       const yr = parseInt(slider.value);
-      yearEl.textContent = yr;
-      yearEl.className = 'mono ' + (yr === 2024 ? 'timeline-live' : 'timeline-historical');
-      noteEl.textContent = yr === 2024 ? 'Current threat assessment' : `Historical GPI data — ${yr}`;
+      const isNow = yr >= NOW;
+      yearEl.textContent = isNow ? 'NOW · LIVE' : yr;
+      yearEl.className = 'mono ' + (isNow ? 'timeline-live' : 'timeline-historical');
+      noteEl.textContent = isNow
+        ? 'Live current threat assessment'
+        : `Historical GPI snapshot · ${yr}`;
+      // For NOW we render the live data exactly; applyHistoricalRisk treats any
+      // year ≥ 2024 as live (delta 0) and falls back to current risk values.
       GeoMap.applyHistoricalRisk(yr, GPI_HISTORY);
     });
   }

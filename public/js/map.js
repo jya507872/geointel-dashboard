@@ -355,16 +355,19 @@ const GeoMap = (() => {
 
   // ── HISTORICAL RISK OVERLAY ───────────────────────────────────
   function applyHistoricalRisk(year, gpiHistory) {
-    const idx = year - 2008; // 0 = 2008, 16 = 2024
+    const idx = year - 2008;        // 0 = 2008, 16 = 2024
+    const isLive = year >= 2025;    // NOW sentinel → render exact live data
     g.selectAll('.country').attr('fill', d => {
       const id  = String(d.id);
+      const current = COUNTRY_DATA[id];
+      // NOW: always the current live assessment, untouched.
+      if (isLive) return current ? getRiskColor(current.risk) : UNKNOWN_COLOR;
       const hist = gpiHistory[id];
       if (hist && hist[idx] !== undefined) return getRiskColor(hist[idx]);
-      const current = COUNTRY_DATA[id];
       if (!current) return UNKNOWN_COLOR;
-      // Slightly randomise historical for countries without explicit history
-      // to give a sense of change while remaining in the right ballpark
-      const delta = year === 2024 ? 0 : (Math.random() < 0.2 ? (Math.random() < 0.5 ? -1 : 1) : 0);
+      // Countries without explicit GPI history: nudge slightly for earlier years
+      // to convey change, but keep 2024 exact (most recent annual snapshot).
+      const delta = year >= 2024 ? 0 : (Math.random() < 0.2 ? (Math.random() < 0.5 ? -1 : 1) : 0);
       return getRiskColor(Math.max(1, Math.min(10, current.risk + delta)));
     });
   }
