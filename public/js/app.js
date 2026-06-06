@@ -8,30 +8,9 @@ const App = (() => {
   // When running locally via `npm start`, use the Express proxy (cached, private).
   const IS_LOCAL = ['localhost','127.0.0.1',''].includes(window.location.hostname);
 
-  // rss2json.com converts RSS → JSON with CORS support (free, no key needed)
-  const RSS_TO_JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
-
-  // Tiered feeds: tier 1 = wire services, 2 = major journalism, 3 = quality specialty
-  // Social media screened separately via Reddit public API
-  const PUBLIC_FEEDS = [
-    // ── TIER 1: Wire Services ────────────────────────────────────
-    { url: 'https://feeds.reuters.com/reuters/worldNews',                  source: 'Reuters',        tier: 1 },
-    { url: 'https://rss.app/feeds/tBtCCLz9uQvGnomp.xml',                 source: 'AP',             tier: 1 },
-    // ── TIER 2: Established International Journalism ─────────────
-    { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',                 source: 'BBC',            tier: 2 },
-    { url: 'https://www.theguardian.com/world/rss',                        source: 'Guardian',       tier: 2 },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',      source: 'NYT',            tier: 2 },
-    { url: 'https://feeds.washingtonpost.com/rss/world',                   source: 'Washington Post', tier: 2 },
-    { url: 'https://www.ft.com/world?format=rss',                          source: 'Financial Times', tier: 2 },
-    // ── TIER 3: Quality Regional & Specialty ─────────────────────
-    { url: 'https://www.aljazeera.com/xml/rss/all.xml',                   source: 'Al Jazeera',     tier: 3 },
-    { url: 'https://feeds.dw.com/rss/rss__en_world',                      source: 'Deutsche Welle', tier: 3 },
-    { url: 'https://www.france24.com/en/rss',                             source: 'France 24',      tier: 3 },
-    { url: 'https://www.rferl.org/api/epiqq',                             source: 'RFE/RL',         tier: 3 },
-    { url: 'https://foreignpolicy.com/feed/',                              source: 'Foreign Policy', tier: 3 },
-    { url: 'https://foreignaffairs.com/rss.xml',                          source: 'Foreign Affairs', tier: 3 },
-    { url: 'https://feeds.bellingcat.com/bellingcat',                     source: 'Bellingcat',     tier: 3 },
-  ];
+  // World news is aggregated server-side (Express /api/news locally, the
+  // Netlify /news function in prod) from ~27 vetted journalistic sources —
+  // see netlify/functions/news.js for the tiered source list.
 
   // Reddit public API — social media screening tier (UNVERIFIED, needs cross-check)
   const REDDIT_FEEDS = [
@@ -994,31 +973,20 @@ const App = (() => {
     try {
       let items = [];
 
-      if (IS_LOCAL) {
-        const res  = await fetch('/api/news');
-        const json = await res.json();
-        items = (json.items || []).map(i => ({ ...i, tier: 2 }));
-      } else {
-        // Deployed: fetch all tiers via rss2json CORS bridge
-        const results = await Promise.allSettled(
-          PUBLIC_FEEDS.map(async (feed) => {
-            try {
-              const res  = await fetch(RSS_TO_JSON + encodeURIComponent(feed.url));
-              const data = await res.json();
-              if (data.status !== 'ok' || !data.items) return [];
-              return data.items.slice(0, 6).map(i => ({
-                title:  (i.title || '').replace(/\s+/g,' ').trim(),
-                source: feed.source,
-                tier:   feed.tier,
-                date:   i.pubDate || '',
-                link:   i.link    || '',
-              })).filter(i => i.title.length > 10);
-            } catch { return []; }
-          })
-        );
-        results.forEach(r => { if (r.status === 'fulfilled') items.push(...r.value); });
-        items.sort((a, b) => new Date(b.date) - new Date(a.date));
-      }
+      // Both environments use a server-side aggregator (Express locally,
+      // Netlify function in prod) that fetches ~27 vetted journalistic feeds,
+      // tier-tags and de-duplicates them. Avoids CORS + the rss2json item cap.
+      const url = IS_LOCAL ? '/api/news' : '/.netlify/functions/news';
+      const res  = await fetch(url);
+      const json = await res.json();
+      items = (json.items || []).map(i => ({
+        title:  i.title || '',
+        source: i.source || '',
+        tier:   i.tier || 3,
+        date:   i.date || '',
+        link:   i.link || '',
+      })).filter(i => i.title.length > 10);
+      items.sort((a, b) => new Date(b.date) - new Date(a.date));
 
       // Social media screening — fetch Reddit in parallel, tag as UNVERIFIED
       fetchSocialMedia().then(socialItems => {

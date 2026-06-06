@@ -82,6 +82,17 @@ const GeoMap = (() => {
   // ── RENDER ────────────────────────────────────────────────────
   function render(topology) {
     const countries = topojson.feature(topology, topology.objects.countries);
+    // world-atlas zero-pads numeric ids to 3 chars ("076","036","004") while
+    // COUNTRY_DATA uses unpadded keys ("76","36","4"). Normalize so every
+    // country (esp. ISO codes < 100 like Brazil/Australia) matches its data.
+    // Partially-recognized states carry id "-99" (no ISO number); map them to
+    // synthetic keys by name so they too resolve to data.
+    const NAME_ID = { 'Kosovo': '383', 'N. Cyprus': '9001', 'Somaliland': '9002' };
+    countries.features.forEach(f => {
+      const nid = parseInt(f.id, 10);
+      if (Number.isFinite(nid) && nid >= 0) { f.id = String(nid); }
+      else { const nm = f.properties && f.properties.name; if (NAME_ID[nm]) f.id = NAME_ID[nm]; }
+    });
     cachedFeatures = countries.features;
 
     // Graticule (lat/long grid) — no pointer events

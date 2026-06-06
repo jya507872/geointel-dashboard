@@ -154,6 +154,48 @@ const COUNTRY_DATA = {
   "008": { name:"Albania",             alpha2:"AL", risk:3,  region:"Europe",            tags:["crime"],                                   info:"Organised crime, EU candidate, improving governance." },
   "352": { name:"Iceland",             alpha2:"IS", risk:1,  region:"Europe",            tags:[],                                          info:"World's most peaceful country, consistently #1 GPI." },
   "360": { name:"Indonesia",           alpha2:"ID", risk:4,  region:"Southeast Asia",    tags:["terrorism","separatism"],                  info:"Vast archipelago, Papua conflict, terrorism managed. Generally stable." },
+
+  // ── Coverage completion: remaining world-atlas countries & territories ──
+  "10":  { name:"Antarctica",          alpha2:"AQ", risk:1,  region:"Antarctica",        tags:[],                                          info:"No permanent population. Scientific research stations under the Antarctic Treaty; extreme environment." },
+  "51":  { name:"Armenia",             alpha2:"AM", risk:4,  region:"Caucasus",          tags:["territorial","political"],                 info:"Lost Nagorno-Karabakh in 2023; tense Azerbaijan border. Pivoting West. Core areas safe for travel." },
+  "31":  { name:"Azerbaijan",          alpha2:"AZ", risk:4,  region:"Caucasus",          tags:["authoritarian","territorial"],             info:"Authoritarian petro-state that retook Nagorno-Karabakh in 2023. Stable but repressive; safe for visitors." },
+  "44":  { name:"Bahamas",             alpha2:"BS", risk:3,  region:"Caribbean",         tags:["crime"],                                   info:"Major tourism economy. Elevated violent crime in parts of Nassau/Freeport; resort areas generally safe." },
+  "112": { name:"Belarus",             alpha2:"BY", risk:5,  region:"Europe",            tags:["authoritarian","political"],               info:"Lukashenko dictatorship aligned with Russia and used to stage the Ukraine war. Severe political repression." },
+  "84":  { name:"Belize",              alpha2:"BZ", risk:4,  region:"Central America",   tags:["crime"],                                   info:"High gang-driven homicide rate. Tourist cayes generally safe; caution in Belize City." },
+  "204": { name:"Benin",               alpha2:"BJ", risk:5,  region:"West Africa",       tags:["terrorism","political"],                   info:"Stable south, but jihadist spillover from the Sahel into northern parks. Democratic backsliding concerns." },
+  "96":  { name:"Brunei",              alpha2:"BN", risk:2,  region:"Southeast Asia",    tags:["authoritarian"],                           info:"Wealthy, very-low-crime absolute monarchy with sharia penal code. Safe but socially restrictive." },
+  "148": { name:"Chad",                alpha2:"TD", risk:7,  region:"Sub-Saharan Africa",tags:["instability","terrorism","political"],     info:"Fragile post-Déby transition. Boko Haram/ISWAP in the Lake Chad basin; coup-prone with recurring refugee crises." },
+  "384": { name:"Côte d'Ivoire",       alpha2:"CI", risk:4,  region:"West Africa",       tags:["political","terrorism"],                   info:"Recovered economic hub after past civil wars. Residual political tension and northern jihadist risk." },
+  "262": { name:"Djibouti",            alpha2:"DJ", risk:4,  region:"Sub-Saharan Africa",tags:["authoritarian"],                           info:"Strategically vital host of foreign military bases. Stable but authoritarian; low violent crime." },
+  "233": { name:"Estonia",             alpha2:"EE", risk:2,  region:"Europe",            tags:["geopolitical"],                            info:"Highly digital EU/NATO member. Very safe; principal concern is exposure on Russia's border." },
+  "238": { name:"Falkland Islands",    alpha2:"FK", risk:1,  region:"South Atlantic",    tags:["territorial"],                             info:"British Overseas Territory. Very safe; sovereignty disputed by Argentina (1982 war)." },
+  "242": { name:"Fiji",                alpha2:"FJ", risk:2,  region:"Oceania",           tags:[],                                          info:"Pacific tourism hub. A history of coups but currently stable democratic governance." },
+  "260": { name:"Fr. S. Antarctic Lands", alpha2:"TF", risk:1, region:"Antarctica",     tags:[],                                          info:"Uninhabited French sub-Antarctic territory; scientific stations only." },
+  "268": { name:"Georgia",             alpha2:"GE", risk:5,  region:"Caucasus",          tags:["territorial","political"],                 info:"Russia occupies Abkhazia & South Ossetia (2008 war). EU-aspirant amid democratic backsliding and unrest." },
+  "304": { name:"Greenland",           alpha2:"GL", risk:1,  region:"North America",     tags:[],                                          info:"Autonomous Danish territory. Very safe, tiny population; rising geopolitical interest in the Arctic." },
+  "428": { name:"Latvia",              alpha2:"LV", risk:2,  region:"Europe",            tags:["geopolitical"],                            info:"Stable EU/NATO member. Primary concern is its border with Russia and Belarus." },
+  "478": { name:"Mauritania",          alpha2:"MR", risk:5,  region:"West Africa",       tags:["terrorism","political"],                   info:"Sahel state with a coup history. Jihadist threat in border regions and an entrenched slavery legacy." },
+  "498": { name:"Moldova",             alpha2:"MD", risk:5,  region:"Europe",            tags:["political","territorial"],                 info:"Europe's poorest state. Russian troops in breakaway Transnistria; heavy Russian destabilisation pressure." },
+  "499": { name:"Montenegro",          alpha2:"ME", risk:2,  region:"Europe",            tags:["political"],                               info:"NATO member and EU candidate. Generally safe, with organised-crime and political-polarisation issues." },
+  "540": { name:"New Caledonia",       alpha2:"NC", risk:4,  region:"Oceania",           tags:["instability","political"],                 info:"French territory hit by deadly pro-independence riots in 2024; periodic unrest over decolonisation." },
+  "512": { name:"Oman",                alpha2:"OM", risk:2,  region:"Middle East",       tags:[],                                          info:"Stable, neutral Gulf sultanate. Low crime and diplomatically moderate; very safe for travel." },
+  "600": { name:"Paraguay",            alpha2:"PY", risk:4,  region:"South America",     tags:["crime","political"],                       info:"Smuggling and organised-crime corridor (Tri-Border Area). Generally calm but corruption-ridden." },
+  "630": { name:"Puerto Rico",         alpha2:"PR", risk:3,  region:"Caribbean",         tags:["crime"],                                   info:"US territory. Tourist areas safe; elevated violent crime in parts of San Juan. Hurricane-exposed." },
+  "90":  { name:"Solomon Islands",     alpha2:"SB", risk:3,  region:"Oceania",           tags:["instability"],                             info:"2021 riots in Honiara; fragile politics amid China–Taiwan competition. Rural areas mostly calm." },
+  "740": { name:"Suriname",            alpha2:"SR", risk:3,  region:"South America",     tags:["crime"],                                   info:"Small, diverse and generally stable. Petty crime in Paramaribo; emerging offshore-oil economy." },
+  "158": { name:"Taiwan",              alpha2:"TW", risk:4,  region:"East Asia",         tags:["geopolitical","territorial"],              info:"Highly developed democracy, very safe internally. Principal risk is cross-strait military tension with China." },
+  "626": { name:"Timor-Leste",         alpha2:"TL", risk:3,  region:"Southeast Asia",    tags:["political"],                               info:"Young democracy stabilised since 2006. Poverty and occasional political friction; broadly peaceful." },
+  "768": { name:"Togo",                alpha2:"TG", risk:5,  region:"West Africa",       tags:["terrorism","authoritarian"],               info:"Long-ruling dynasty. Jihadist attacks spilling into the north; periodic crackdowns on protest." },
+  "780": { name:"Trinidad & Tobago",   alpha2:"TT", risk:5,  region:"Caribbean",         tags:["crime"],                                   info:"Energy-rich but among the Caribbean's highest homicide rates; gang and gun violence. Tourist caution." },
+  "795": { name:"Turkmenistan",        alpha2:"TM", risk:4,  region:"Central Asia",      tags:["authoritarian","isolated"],                info:"One of the world's most closed, repressive states. Low street crime but extreme surveillance and isolation." },
+  "548": { name:"Vanuatu",             alpha2:"VU", risk:2,  region:"Oceania",           tags:[],                                          info:"Low-crime Pacific archipelago. Highly exposed to cyclones and earthquakes; politically stable." },
+  "732": { name:"Western Sahara",      alpha2:"EH", risk:5,  region:"North Africa",      tags:["territorial","political"],                 info:"Disputed territory mostly controlled by Morocco; Polisario independence claim. Frozen conflict, land-mine risk." },
+  "894": { name:"Zambia",              alpha2:"ZM", risk:3,  region:"Sub-Saharan Africa",tags:["political","economic"],                    info:"Stable multiparty democracy under debt-default economic stress. Generally safe with normal precautions." },
+
+  // ── Partially-recognized states (no ISO number; matched by name on the map) ──
+  "383": { name:"Kosovo",              alpha2:"XK", risk:4,  region:"Europe",            tags:["territorial","political"],                 info:"Recognized by ~100 states, not Serbia. Generally safe; tension in the Serb-majority north, KFOR peacekeepers present." },
+  "9001":{ name:"Northern Cyprus",     alpha2:"CY", risk:2,  region:"Europe",            tags:["territorial"],                             info:"Turkish-controlled, recognized only by Türkiye. Generally safe; frozen division of Cyprus since 1974." },
+  "9002":{ name:"Somaliland",          alpha2:"SO", risk:5,  region:"Sub-Saharan Africa",tags:["territorial","political"],                 info:"Self-declared independent (unrecognized), far more stable than the rest of Somalia. Border clashes in the disputed east." },
 };
 
 // ── MAJOR WORLD EVENTS (map markers) ───────────────────────────
@@ -724,15 +766,21 @@ const SOURCE_TRUST = {
   // Major established international journalism
   TIER2: {
     level: 2, label: "VERIFIED", css: "trust-t2",
-    orgs: ['BBC','Guardian','NYT','Washington Post','Financial Times','Der Spiegel',
-           'The Economist','Le Monde','Wall Street Journal','WSJ','Bloomberg','Time']
+    orgs: ['BBC','Guardian','NYT','New York Times','nytimes','Washington Post','washingtonpost',
+           'Financial Times','ft.com','Der Spiegel','The Economist','economist','Le Monde',
+           'Wall Street Journal','WSJ','Bloomberg','Time','NPR','CNN','CBC','Sky News','skynews',
+           'ABC News','abc.net.au','El País','El Pais','elpais','Los Angeles Times','latimes',
+           'PBS','Politico','politico']
   },
   // Quality regional & specialty journalism
   TIER3: {
     level: 3, label: "REPORTED", css: "trust-t3",
-    orgs: ['Al Jazeera','Deutsche Welle','DW','France 24','NHK World','Radio Free Europe',
-           'RFE/RL','Bellingcat','Foreign Policy','FP','Politico','The Atlantic',
-           'Middle East Eye','Dawn','The Hindu','Haaretz','L\'Orient Today']
+    orgs: ['Al Jazeera','aljazeera','Deutsche Welle','DW','France 24','france24','NHK World',
+           'Radio Free Europe','RFE/RL','rferl','Bellingcat','Foreign Policy','foreignpolicy','FP',
+           'Foreign Affairs','foreignaffairs','The Atlantic','Middle East Eye','middleeasteye',
+           'Dawn','The Hindu','thehindu','Haaretz','L\'Orient Today','SCMP','South China Morning Post',
+           'scmp','Times of Israel','timesofisrael','Moscow Times','themoscowtimes',
+           'Channel NewsAsia','channelnewsasia','Times of India','timesofindia','Kyiv Independent']
   },
   // Social / unverified — needs cross-check
   SOCIAL: {

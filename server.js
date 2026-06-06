@@ -12,13 +12,35 @@ let gdeltCache = { data: [], lastFetch: 0 };
 const NEWS_TTL = 5 * 60 * 1000;
 const GDELT_TTL = 10 * 60 * 1000;
 
+// Curated internationally-recognized journalism. Tiers: 1 wire · 2 major intl · 3 quality regional.
 const RSS_FEEDS = [
-  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'BBC' },
-  { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'Al Jazeera' },
-  { url: 'https://www.theguardian.com/world/rss', source: 'Guardian' },
-  { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', source: 'NYT' },
-  { url: 'https://feeds.reuters.com/reuters/worldNews', source: 'Reuters' },
-  { url: 'https://foreignpolicy.com/feed/', source: 'Foreign Policy' },
+  { source: 'Reuters', tier: 1, url: 'https://news.google.com/rss/search?q=when:1d%20site:reuters.com&hl=en-US&gl=US&ceid=US:en', strip: true },
+  { source: 'AP',      tier: 1, url: 'https://news.google.com/rss/search?q=when:1d%20site:apnews.com&hl=en-US&gl=US&ceid=US:en', strip: true },
+  { source: 'BBC',             tier: 2, url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+  { source: 'Guardian',        tier: 2, url: 'https://www.theguardian.com/world/rss' },
+  { source: 'NYT',             tier: 2, url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml' },
+  { source: 'Washington Post', tier: 2, url: 'https://feeds.washingtonpost.com/rss/world' },
+  { source: 'Financial Times', tier: 2, url: 'https://www.ft.com/world?format=rss' },
+  { source: 'The Economist',   tier: 2, url: 'https://www.economist.com/international/rss.xml' },
+  { source: 'NPR',             tier: 2, url: 'https://feeds.npr.org/1004/rss.xml' },
+  { source: 'CNN',             tier: 2, url: 'http://rss.cnn.com/rss/edition_world.rss' },
+  { source: 'CBC',             tier: 2, url: 'https://www.cbc.ca/webfeed/rss/rss-world' },
+  { source: 'Sky News',        tier: 2, url: 'https://feeds.skynews.com/feeds/rss/world.xml' },
+  { source: 'ABC Australia',   tier: 2, url: 'https://www.abc.net.au/news/feed/51120/rss.xml' },
+  { source: 'El País',         tier: 2, url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/english.elpais.com/portada' },
+  { source: 'Al Jazeera',      tier: 3, url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+  { source: 'Deutsche Welle',  tier: 3, url: 'https://rss.dw.com/rdf/rss-en-world' },
+  { source: 'France 24',       tier: 3, url: 'https://www.france24.com/en/rss' },
+  { source: 'RFE/RL',          tier: 3, url: 'https://www.rferl.org/api/epiqq' },
+  { source: 'Foreign Policy',  tier: 3, url: 'https://foreignpolicy.com/feed/' },
+  { source: 'Foreign Affairs', tier: 3, url: 'https://www.foreignaffairs.com/rss.xml' },
+  { source: 'Bellingcat',      tier: 3, url: 'https://www.bellingcat.com/feed/' },
+  { source: 'The Hindu',       tier: 3, url: 'https://www.thehindu.com/news/international/feeder/default.rss' },
+  { source: 'SCMP',            tier: 3, url: 'https://www.scmp.com/rss/91/feed' },
+  { source: 'Times of Israel', tier: 3, url: 'https://www.timesofisrael.com/feed/' },
+  { source: 'Moscow Times',    tier: 3, url: 'https://www.themoscowtimes.com/rss/news' },
+  { source: 'Channel NewsAsia',tier: 3, url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml' },
+  { source: 'Times of India',  tier: 3, url: 'https://timesofindia.indiatimes.com/rssfeeds/296589292.cms' },
 ];
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -68,12 +90,17 @@ app.get('/api/news', async (req, res) => {
         rssParser.parseURL(feed.url),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 7000)),
       ]);
-      const items = (feedData.items || []).slice(0, 8).map(item => ({
-        title: item.title ? item.title.replace(/\s+/g, ' ').trim() : '',
-        source: feed.source,
-        date: item.pubDate || item.isoDate || new Date().toISOString(),
-        link: item.link || '',
-      })).filter(i => i.title.length > 10);
+      const items = (feedData.items || []).slice(0, 6).map(item => {
+        let title = item.title ? item.title.replace(/\s+/g, ' ').trim() : '';
+        if (feed.strip) title = title.replace(/\s+-\s+[^-–]{2,28}$/, '').trim();
+        return {
+          title,
+          source: feed.source,
+          tier: feed.tier || 3,
+          date: item.pubDate || item.isoDate || new Date().toISOString(),
+          link: item.link || '',
+        };
+      }).filter(i => i.title.length > 10);
       return items;
     } catch (err) {
       console.warn(`[RSS] ${feed.source}: ${err.message}`);
@@ -83,10 +110,13 @@ app.get('/api/news', async (req, res) => {
 
   const results = await Promise.allSettled(fetchPromises);
   results.forEach(r => { if (r.status === 'fulfilled') allItems.push(...r.value); });
-  allItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const seen = new Set();
+  const deduped = allItems.filter(i => { const k = i.title.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  deduped.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  if (allItems.length > 0) newsCache = { data: allItems, lastFetch: Date.now() };
-  res.json({ items: allItems.length > 0 ? allItems : newsCache.data, source: 'live' });
+  if (deduped.length > 0) newsCache = { data: deduped, lastFetch: Date.now() };
+  const out = deduped.length > 0 ? deduped : newsCache.data;
+  res.json({ items: out, sourcesLive: new Set(out.map(i => i.source)).size, source: 'live' });
 });
 
 app.get('/api/events', async (req, res) => {
