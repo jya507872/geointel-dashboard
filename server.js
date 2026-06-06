@@ -23,6 +23,38 @@ const RSS_FEEDS = [
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// US State Dept travel advisories — mirrors the Netlify function for local dev.
+let advisoryCache = { data: [], lastFetch: 0 };
+const ADVISORY_TTL = 60 * 60 * 1000; // 1h
+app.get('/api/advisories', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  if (Date.now() - advisoryCache.lastFetch < ADVISORY_TTL && advisoryCache.data.length) {
+    return res.json({ items: advisoryCache.data, cached: true });
+  }
+  try {
+    const r = await fetch('https://travel.state.gov/_res/rss/TAsTWs.xml', {
+      headers: { 'User-Agent': 'GeoIntelDashboard/1.0' },
+    });
+    const xml = await r.text();
+    const items = [];
+    const itemRe = /<item>([\s\S]*?)<\/item>/g;
+    let m;
+    while ((m = itemRe.exec(xml))) {
+      const block = m[1];
+      const title = ((block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '')
+        .replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').trim();
+      const date  = ((block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '').trim();
+      const lm = title.match(/^(.*?)\s*-\s*Level\s*([1-4])\s*:\s*(.*)$/i);
+      if (!lm) continue;
+      items.push({ name: lm[1].trim(), level: +lm[2], label: lm[3].trim(), date });
+    }
+    if (items.length) advisoryCache = { data: items, lastFetch: Date.now() };
+    res.json({ items: items.length ? items : advisoryCache.data, updated: new Date().toISOString() });
+  } catch (e) {
+    res.status(502).json({ items: advisoryCache.data, error: String(e) });
+  }
+});
+
 app.get('/api/news', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   if (Date.now() - newsCache.lastFetch < NEWS_TTL && newsCache.data.length > 0) {

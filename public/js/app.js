@@ -48,6 +48,49 @@ const App = (() => {
   let travelOriginId    = null;   // numeric ISO id of "flying from" country
   let travelOriginAlpha2 = null;  // alpha2 for insurance lookup
 
+  // Travel verdicts indexed 1–10 (round the score to index in)
+  const VERDICTS = [
+    null,
+    { text:'VERY SAFE TO VISIT',     cls:'verdict-safe'    }, // 1
+    { text:'SAFE TO VISIT',           cls:'verdict-safe'    }, // 2
+    { text:'GENERALLY SAFE',          cls:'verdict-safe'    }, // 3
+    { text:'EXERCISE CAUTION',        cls:'verdict-caution' }, // 4
+    { text:'SOME CAUTION ADVISED',    cls:'verdict-caution' }, // 5
+    { text:'ELEVATED RISK',           cls:'verdict-avoid'   }, // 6
+    { text:'HIGH RISK — RECONSIDER',  cls:'verdict-avoid'   }, // 7
+    { text:'DO NOT TRAVEL',           cls:'verdict-danger'  }, // 8
+    { text:'DO NOT TRAVEL',           cls:'verdict-danger'  }, // 9
+    { text:'EXTREME DANGER — AVOID',  cls:'verdict-extreme' }, // 10
+  ];
+
+  // ── ADVISORY ALIAS MAPS ───────────────────────────────────────
+  // State Dept feed name (normalized) → our dataset name (normalized)
+  const US_ADV_ALIAS = {
+    'burma': 'myanmar',
+    'democratic republic of the congo': 'dr congo',
+    'republic of the congo': 'congo rep',
+    'czechia': 'czech republic',
+    'bosnia and herzegovina': 'bosnia',
+    'central african republic': 'cent african rep',
+    'kyrgyz republic': 'kyrgyzstan',
+    'united arab emirates': 'uae',
+    'kingdom of denmark': 'denmark',
+    'equatorial guinea': 'eq guinea',
+  };
+  // Our dataset name (normalized) → gov.uk advisory slug (verified 200s)
+  const UK_SLUG_ALIAS = {
+    'dr congo': 'democratic-republic-of-the-congo',
+    'congo rep': 'congo',
+    'south korea': 'south-korea',
+    'north korea': 'north-korea',
+    'united states': 'usa',
+    'czech republic': 'czech-republic',
+    'myanmar': 'myanmar',
+    'turkiye': 'turkey',
+    'cent african rep': 'central-african-republic',
+    'eq guinea': 'equatorial-guinea',
+  };
+
   // ── HISTORICAL GPI RISK DATA (approx. per year, selected countries) ──
   // Format: { iso: [risk2008, risk2009, ..., risk2024] } — 17 values
   // We interpolate for countries not in list; values shift gradually
@@ -93,8 +136,10 @@ const App = (() => {
 
     fetchNews();
     fetchGdelt();
+    fetchUsAdvisories();                                  // US State Dept advisory levels
     setInterval(fetchNews,  NEWS_POLL_MS);
     setInterval(fetchGdelt, GDELT_POLL_MS);
+    setInterval(fetchUsAdvisories, 6 * 60 * 60 * 1000);   // refresh advisories every 6h
     setSignal('SIGNAL LIVE', false);
 
     // Mobile panel toggle
@@ -331,40 +376,36 @@ const App = (() => {
 
     const { data } = country;
     const risk = data.risk;
-    const color = getRiskColor(risk);
-
-    const verdicts = [
-      null,
-      { text:'VERY SAFE TO VISIT',     cls:'verdict-safe'    }, // 1
-      { text:'SAFE TO VISIT',           cls:'verdict-safe'    }, // 2
-      { text:'GENERALLY SAFE',          cls:'verdict-safe'    }, // 3
-      { text:'EXERCISE CAUTION',        cls:'verdict-caution' }, // 4
-      { text:'SOME CAUTION ADVISED',    cls:'verdict-caution' }, // 5
-      { text:'ELEVATED RISK',           cls:'verdict-avoid'   }, // 6
-      { text:'HIGH RISK — RECONSIDER',  cls:'verdict-avoid'   }, // 7
-      { text:'DO NOT TRAVEL',           cls:'verdict-danger'  }, // 8
-      { text:'DO NOT TRAVEL',           cls:'verdict-danger'  }, // 9
-      { text:'EXTREME DANGER — AVOID',  cls:'verdict-extreme' }, // 10
-    ];
-
-    const v = verdicts[Math.min(risk, 10)];
 
     const travelTips = getTravelTips(data, country.id, travelOriginId, travelOriginAlpha2);
 
     document.getElementById('tr-flag').textContent = getFlag(data.alpha2);
     document.getElementById('tr-country-name').textContent = data.name;
-    document.getElementById('tr-verdict-badge').textContent = v.text;
-    document.getElementById('tr-verdict-badge').className = `verdict-badge ${v.cls}`;
 
-    // Gauge needle position
-    const pct = ((risk - 1) / 9) * 100;
-    document.getElementById('tr-gauge-fill').style.left = `${pct}%`;
+    // Apply baseline verdict + gauge immediately (false = baseline, not live)
+    applyTravelVerdict(risk, false);
 
     document.getElementById('tr-sections').innerHTML = travelTips;
-    loadLiveSignal(data.name, 'tr-live-signal', 'tr-asof-date');
+
+    // Load the live-adjusted assessment, then re-apply verdict with the
+    // blended score once government advisories + GDELT resolve.
+    loadLiveAssessment(data, 'tr-live-signal', 'tr-asof-date').then(blend => {
+      if (blend && typeof blend.score === 'number') applyTravelVerdict(blend.score, true);
+    });
 
     document.getElementById('travel-placeholder').classList.add('hidden');
     document.getElementById('travel-result').classList.remove('hidden');
+  }
+
+  // Apply verdict badge + gauge needle from a score. `isLive` flags that the
+  // score reflects the blended live-adjusted figure (vs. the GPI baseline).
+  function applyTravelVerdict(score, isLive) {
+    const v = VERDICTS[Math.min(Math.max(Math.round(score), 1), 10)];
+    const badge = document.getElementById('tr-verdict-badge');
+    badge.textContent = v.text + (isLive ? '  · LIVE' : '');
+    badge.className = `verdict-badge ${v.cls}${isLive ? ' verdict-live' : ''}`;
+    const pct = ((Math.max(1, Math.min(10, score)) - 1) / 9) * 100;
+    document.getElementById('tr-gauge-fill').style.left = `${pct}%`;
   }
 
   function getTravelTips(data, countryId, originId, originAlpha2) {
@@ -407,7 +448,7 @@ const App = (() => {
 
     const sections = [
       { icon: '🛡️', title: 'OVERALL SAFETY',    body: `${safetyLevel} risk. ${escHtml(data.info)}`, isHtml: true },
-      { icon: '📈', title: 'CURRENT ACTIVITY (LIVE)', body: `<div id="tr-live-signal" class="live-signal">${liveSignalLoadingHTML()}</div>`, isHtml: true },
+      { icon: '📈', title: 'LIVE-ADJUSTED ASSESSMENT', body: `<div id="tr-live-signal" class="live-signal">${liveSignalLoadingHTML()}</div>`, isHtml: true },
       { icon: '✈',  title: 'AIRLINES & ACCESS',  body: airBody + airlinesHtml, isHtml: true },
       { icon: '🔫', title: 'CRIME & VIOLENCE',   body: escHtml(crimeRisk), isHtml: true },
       { icon: '💥', title: 'TERRORISM',          body: escHtml(terrorRisk), isHtml: true },
@@ -649,7 +690,7 @@ const App = (() => {
     document.getElementById('cp-tags').innerHTML = (data.tags||[]).map(t =>
       `<span class="cp-tag ${getTagClass(t)}">${t}</span>`).join('');
     document.getElementById('cp-info').textContent = data.info||'';
-    loadLiveSignal(data.name, 'cp-live-signal');
+    loadLiveAssessment(data, 'cp-live-signal');
     document.getElementById('cp-news').innerHTML =
       `<div class="news-item"><div class="ni-title" style="color:var(--text-dim);font-style:italic">Searching intelligence feed…</div></div>`;
     fetchCountryNews(data.name);
@@ -720,8 +761,12 @@ const App = (() => {
       const terms = 'conflict OR attack OR clashes OR unrest OR protest OR military OR strike OR killed OR violence OR crisis OR sanctions';
       const q   = `"${name}" (${terms})`;
       const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q)}&mode=timelinevol&timespan=14d&format=json`;
-      const res  = await fetch(url);
+      // Abort if GDELT is slow so it can't stall the advisory display
+      const ctrl = new AbortController();
+      const to   = setTimeout(() => ctrl.abort(), 8000);
+      const res  = await fetch(url, { signal: ctrl.signal });
       const json = await res.json();
+      clearTimeout(to);
       const series = json?.timeline?.[0]?.data || [];
       if (series.length < 4) { _liveSignalCache[name] = { ts: Date.now(), sig: null }; return null; }
 
@@ -779,18 +824,169 @@ const App = (() => {
       <div class="ls-note">Conflict-related news activity vs. the prior week · GDELT, refreshed every ~15 min</div>`;
   }
 
-  function loadLiveSignal(name, elId, asOfElId) {
+  // ── GOVERNMENT TRAVEL ADVISORIES ──────────────────────────────
+  function normName(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]+/g,' ').trim();
+  }
+
+  // US State Dept — single RSS feed lists every country with Level 1–4.
+  // No CORS on the source, so bridge through rss2json (same as news feeds).
+  let usAdvisoryStore = null; // normName → { level, label, date }
+
+  async function fetchUsAdvisories() {
+    // Server-side fetch+parse (Netlify function in prod, Express route locally)
+    // avoids CORS and the 10-item cap that public RSS proxies impose.
+    const url = IS_LOCAL ? '/api/advisories' : '/.netlify/functions/advisories';
+    try {
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (!data.items || !data.items.length) return;
+      const store = {};
+      data.items.forEach(it => {
+        let key = normName(it.name).replace(/^the /,'').replace(/ travel advisory$/,'');
+        key = US_ADV_ALIAS[key] || key;
+        // The feed can list a country more than once (summary + advisory).
+        // Keep the most severe level so the display is deterministic & conservative.
+        const prev = store[key];
+        if (!prev || it.level > prev.level) {
+          store[key] = { level: it.level, label: it.label || '', date: it.date || '' };
+        }
+      });
+      if (Object.keys(store).length) usAdvisoryStore = store;
+    } catch { /* advisories simply won't show */ }
+  }
+
+  function getUsAdvisory(name) {
+    if (!usAdvisoryStore) return null;
+    return usAdvisoryStore[normName(name)] || null;
+  }
+
+  // UK FCDO — per-country JSON API, CORS-enabled, fetched on demand.
+  const _ukAdvCache = {}; // slug → { ts, v }
+
+  function ukSlug(name) {
+    const k = normName(name);
+    return UK_SLUG_ALIAS[k] || k.replace(/\s+/g,'-');
+  }
+
+  async function fetchUkAdvisory(name) {
+    const slug = ukSlug(name);
+    const c = _ukAdvCache[slug];
+    if (c && (Date.now() - c.ts) < 6 * 3600 * 1000) return c.v;
+    try {
+      const res = await fetch(`https://www.gov.uk/api/content/foreign-travel-advice/${slug}`);
+      if (!res.ok) { _ukAdvCache[slug] = { ts: Date.now(), v: null }; return null; }
+      const d = await res.json();
+      const status = (d.details && d.details.alert_status) || [];
+      const v = { status, date: (d.public_updated_at || '').slice(0,10),
+                  url: `https://www.gov.uk/foreign-travel-advice/${slug}` };
+      _ukAdvCache[slug] = { ts: Date.now(), v };
+      return v;
+    } catch { _ukAdvCache[slug] = { ts: Date.now(), v: null }; return null; }
+  }
+
+  function ukSeverity(status) {
+    if (!status || !status.length) return { sev: 0, label: 'No specific warning' };
+    const has = s => status.includes(s);
+    if (has('avoid_all_travel_to_whole_country'))          return { sev: 4, label: 'Advise against ALL travel' };
+    if (has('avoid_all_but_essential_travel_to_whole_country')) return { sev: 3, label: 'Against all but essential travel' };
+    if (has('avoid_all_travel_to_parts'))                  return { sev: 3, label: 'Against all travel to parts' };
+    if (has('avoid_all_but_essential_travel_to_parts'))    return { sev: 2, label: 'Against essential-only travel to parts' };
+    return { sev: 1, label: 'Active advisory' };
+  }
+
+  // ── BLENDED LIVE SCORE ────────────────────────────────────────
+  // Annual GPI baseline, nudged by live GDELT trend, then floored by the
+  // (authoritative) government advisories. Advisories only ever raise the
+  // score — a warning can't certify safety. Result clamped to 1–10.
+  function computeLiveScore(base, gdeltSig, usAdv, ukAdv) {
+    let score = base;
+    const reasons = [];
+
+    if (gdeltSig) {
+      const mag = { High:1.2, Elevated:0.8, Moderate:0.5, Low:0.3 }[gdeltSig.intensity] || 0.4;
+      if (gdeltSig.trend === 'escalating') { score += mag; reasons.push(`↑ escalating news activity (+${mag.toFixed(1)})`); }
+      else if (gdeltSig.trend === 'easing') { const d = Math.min(mag, 0.8); score -= d; reasons.push(`↓ easing news activity (−${d.toFixed(1)})`); }
+    }
+
+    const floors = [];
+    if (usAdv) { const f = { 4:8.5, 3:6.5, 2:4.5, 1:0 }[usAdv.level] || 0; if (f) floors.push({ f, why:`US State Dept Level ${usAdv.level}` }); }
+    if (ukAdv) { const s = ukSeverity(ukAdv.status); const f = { 4:8.5, 3:7, 2:5.5, 1:0, 0:0 }[s.sev] || 0; if (f) floors.push({ f, why:`UK FCDO: ${s.label}` }); }
+    const top = floors.sort((a,b) => b.f - a.f)[0];
+    if (top && top.f > score) { score = score * 0.35 + top.f * 0.65; reasons.push(`floor raised by ${top.why}`); }
+
+    score = Math.max(1, Math.min(10, score));
+    const rounded = Math.round(score * 10) / 10;
+    return { score: rounded, delta: Math.round((rounded - base) * 10) / 10, reasons };
+  }
+
+  function fmtAdvDate(d) {
+    const t = new Date(d);
+    if (isNaN(t)) return '';
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${t.getUTCDate()} ${MONTHS[t.getUTCMonth()]} ${t.getUTCFullYear()}`;
+  }
+
+  // ── UNIFIED LIVE ASSESSMENT RENDER ────────────────────────────
+  function liveAssessmentHTML(data, gdeltSig, usAdv, ukAdv, blend) {
+    const base   = data.risk;
+    const adjCol = getRiskColor(Math.round(blend.score));
+    const baseCol= getRiskColor(base);
+    const deltaTxt = blend.delta > 0 ? `▲ +${blend.delta}` : blend.delta < 0 ? `▼ ${blend.delta}` : '▬ no change';
+    const deltaCls = blend.delta > 0 ? 'ls-up' : blend.delta < 0 ? 'ls-down' : 'ls-flat';
+
+    // Blended score header
+    let html = `
+      <div class="la-score">
+        <span class="la-base">Baseline <b style="color:${baseCol}">${base}</b></span>
+        <span class="la-arrow">→</span>
+        <span class="la-adj">Live-adjusted <b style="color:${adjCol}">${blend.score}</b></span>
+        <span class="la-delta ${deltaCls}">${deltaTxt}</span>
+      </div>`;
+
+    // Advisory badges
+    let badges = '';
+    if (usAdv) {
+      const c = { 1:'#44ee88', 2:'#ffdd44', 3:'#ff8844', 4:'#ff3b3b' }[usAdv.level] || '#9fb6c8';
+      badges += `<a class="adv-badge" style="border-color:${c};color:${c}" href="https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html" target="_blank" rel="noopener">🇺🇸 US Level ${usAdv.level}${usAdv.date ? ` <span class="adv-date">${fmtAdvDate(usAdv.date)}</span>` : ''}</a>`;
+    }
+    if (ukAdv) {
+      const s = ukSeverity(ukAdv.status);
+      const c = ['#9fb6c8','#ffdd44','#ffbb44','#ff8844','#ff3b3b'][s.sev] || '#9fb6c8';
+      badges += `<a class="adv-badge" style="border-color:${c};color:${c}" href="${escHtml(ukAdv.url)}" target="_blank" rel="noopener">🇬🇧 UK FCDO · ${escHtml(s.label)}${ukAdv.date ? ` <span class="adv-date">${ukAdv.date}</span>` : ''}</a>`;
+    }
+    if (!usAdv && !ukAdv) badges = `<span class="adv-none">No US/UK government advisory matched for this country</span>`;
+    html += `<div class="adv-badges">${badges}</div>`;
+
+    // GDELT live signal
+    html += liveSignalHTML(gdeltSig);
+
+    // Reasons for the adjustment
+    if (blend.reasons.length) {
+      html += `<div class="la-reasons"><span class="la-reasons-lbl">WHAT MOVED IT:</span> ${blend.reasons.map(escHtml).join(' · ')}</div>`;
+    }
+    return html;
+  }
+
+  async function loadLiveAssessment(data, elId, asOfElId) {
     const el = document.getElementById(elId);
-    if (!el) return;
+    if (!el) return null;
     el.innerHTML = liveSignalLoadingHTML();
-    fetchLiveSignal(name).then(sig => {
-      const cur = document.getElementById(elId);
-      if (cur) cur.innerHTML = liveSignalHTML(sig);
-      if (asOfElId && sig) {
-        const a = document.getElementById(asOfElId);
-        if (a) a.textContent = sig.asOf;
-      }
-    });
+    const [gdeltSig, ukAdv] = await Promise.all([
+      fetchLiveSignal(data.name),
+      fetchUkAdvisory(data.name),
+    ]);
+    const usAdv = getUsAdvisory(data.name);
+    const blend = computeLiveScore(data.risk, gdeltSig, usAdv, ukAdv);
+
+    const cur = document.getElementById(elId);
+    if (cur) cur.innerHTML = liveAssessmentHTML(data, gdeltSig, usAdv, ukAdv, blend);
+    if (asOfElId && gdeltSig) {
+      const a = document.getElementById(asOfElId);
+      if (a) a.textContent = gdeltSig.asOf;
+    }
+    return blend;
   }
 
   // ── FETCH NEWS ────────────────────────────────────────────────

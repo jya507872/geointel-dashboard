@@ -5,3 +5,4 @@ node_modules/
 GeoIntel.app/
 geointel-deploy.zip
 GeoIntel.applescript
+.claude/
