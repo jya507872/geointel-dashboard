@@ -176,11 +176,7 @@
 
       <!-- ── INTEL FEED TAB ──────────────────────────────────── -->
       <div id="tab-feed" class="tab-content active">
-        <div class="panel-section-title">
-          <span class="section-icon">◈</span> ACTIVE SITUATIONS
-        </div>
-        <div id="events-list"></div>
-
+        <!-- Freshest content first so the feed reads as live -->
         <div class="panel-section-title">
           <span class="section-icon">📰</span> LIVE PRESS WIRE
           <span id="wire-updated" class="source-badge">syncing…</span>
@@ -192,6 +188,12 @@
           <span id="gdelt-badge" class="source-badge">GDELT · MULTI-SOURCE</span>
         </div>
         <div id="gdelt-list"></div>
+
+        <div class="panel-section-title">
+          <span class="section-icon">◈</span> ACTIVE SITUATIONS
+          <span class="source-badge">ONGOING CONFLICTS</span>
+        </div>
+        <div id="events-list"></div>
 
         <!-- Social media layer — hidden until data arrives -->
         <div id="social-section" class="hidden">
