@@ -1608,6 +1608,57 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   text-overflow: ellipsis;
 }
 
+/* ── LIVE ACTIVITY SIGNAL ────────────────────────────────────── */
+.live-signal {
+  margin: 10px 14px 4px;
+  padding: 9px 11px;
+  background: rgba(0,180,255,0.05);
+  border: 1px solid rgba(0,180,255,0.18);
+  border-radius: 6px;
+}
+#tr-live-signal.live-signal { margin: 0; }
+.ls-row { display: flex; align-items: center; gap: 7px; }
+.ls-live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ff3b3b;
+  box-shadow: 0 0 6px #ff3b3b;
+  animation: ls-pulse 1.6s infinite;
+  flex-shrink: 0;
+}
+.ls-live-dot.ls-dim { background: var(--text-dim); box-shadow: none; animation: none; }
+@keyframes ls-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.ls-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.ls-label.ls-muted { color: var(--text-dim); text-transform: none; letter-spacing: 0.3px; }
+.ls-body { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0 5px; }
+.ls-intensity, .ls-trend {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+.ls-int-low  { color:#44ee88; border-color:#0a5c2e; background:rgba(10,92,46,0.25); }
+.ls-int-mod  { color:#ffdd44; border-color:#b4a020; background:rgba(180,160,32,0.18); }
+.ls-int-elev { color:#ff8844; border-color:#c44c00; background:rgba(196,76,0,0.22); }
+.ls-int-high { color:#ff3b3b; border-color:#941000; background:rgba(148,16,0,0.25); }
+.ls-up   { color:#ff5533; border-color:#941000; background:rgba(148,16,0,0.2); }
+.ls-flat { color:#9fb6c8; border-color:#3a5066; background:rgba(58,80,102,0.2); }
+.ls-down { color:#44ee88; border-color:#0a5c2e; background:rgba(10,92,46,0.2); }
+.ls-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
 /* ── RESPONSIVE — TABLET ─────────────────────────────────────── */
 @media (max-width: 900px) {
   :root { --panel-w: 280px; }

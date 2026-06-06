@@ -361,6 +361,7 @@ const App = (() => {
     document.getElementById('tr-gauge-fill').style.left = `${pct}%`;
 
     document.getElementById('tr-sections').innerHTML = travelTips;
+    loadLiveSignal(data.name, 'tr-live-signal', 'tr-asof-date');
 
     document.getElementById('travel-placeholder').classList.add('hidden');
     document.getElementById('travel-result').classList.remove('hidden');
@@ -406,6 +407,7 @@ const App = (() => {
 
     const sections = [
       { icon: '🛡️', title: 'OVERALL SAFETY',    body: `${safetyLevel} risk. ${escHtml(data.info)}`, isHtml: true },
+      { icon: '📈', title: 'CURRENT ACTIVITY (LIVE)', body: `<div id="tr-live-signal" class="live-signal">${liveSignalLoadingHTML()}</div>`, isHtml: true },
       { icon: '✈',  title: 'AIRLINES & ACCESS',  body: airBody + airlinesHtml, isHtml: true },
       { icon: '🔫', title: 'CRIME & VIOLENCE',   body: escHtml(crimeRisk), isHtml: true },
       { icon: '💥', title: 'TERRORISM',          body: escHtml(terrorRisk), isHtml: true },
@@ -647,6 +649,7 @@ const App = (() => {
     document.getElementById('cp-tags').innerHTML = (data.tags||[]).map(t =>
       `<span class="cp-tag ${getTagClass(t)}">${t}</span>`).join('');
     document.getElementById('cp-info').textContent = data.info||'';
+    loadLiveSignal(data.name, 'cp-live-signal');
     document.getElementById('cp-news').innerHTML =
       `<div class="news-item"><div class="ni-title" style="color:var(--text-dim);font-style:italic">Searching intelligence feed…</div></div>`;
     fetchCountryNews(data.name);
@@ -700,6 +703,94 @@ const App = (() => {
     } catch {
       el.innerHTML = `<div class="news-item"><div class="ni-title" style="color:var(--text-dim)">Feed temporarily unavailable</div></div>`;
     }
+  }
+
+  // ── LIVE ACTIVITY SIGNAL (GDELT, updates ~every 15 min) ───────
+  // Reads conflict-related news intensity for a country over the last
+  // 14 days and compares the recent week to the prior week to derive a
+  // genuinely daily-fresh trend that sits on top of the annual GPI base.
+  const _liveSignalCache = {}; // name → { ts, sig }
+
+  async function fetchLiveSignal(name) {
+    // Cache for 30 min to avoid hammering GDELT on repeated selections
+    const cached = _liveSignalCache[name];
+    if (cached && (Date.now() - cached.ts) < 30 * 60 * 1000) return cached.sig;
+
+    try {
+      const terms = 'conflict OR attack OR clashes OR unrest OR protest OR military OR strike OR killed OR violence OR crisis OR sanctions';
+      const q   = `"${name}" (${terms})`;
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q)}&mode=timelinevol&timespan=14d&format=json`;
+      const res  = await fetch(url);
+      const json = await res.json();
+      const series = json?.timeline?.[0]?.data || [];
+      if (series.length < 4) { _liveSignalCache[name] = { ts: Date.now(), sig: null }; return null; }
+
+      const vals  = series.map(d => +d.value || 0);
+      const dates = series.map(d => d.date || '');
+      const half  = Math.floor(vals.length / 2);
+      const prior  = vals.slice(0, half);
+      const recent = vals.slice(half);
+      const avg = a => a.reduce((s,x) => s + x, 0) / (a.length || 1);
+      const rAvg = avg(recent), pAvg = avg(prior);
+      const ratio = pAvg > 0 ? rAvg / pAvg : (rAvg > 0 ? 2 : 1);
+
+      // rAvg is % of all global news coverage mentioning country + conflict terms
+      const intensity = rAvg >= 0.15 ? 'High' : rAvg >= 0.05 ? 'Elevated' : rAvg >= 0.012 ? 'Moderate' : 'Low';
+      const trend = ratio >= 1.3 ? 'escalating' : ratio <= 0.75 ? 'easing' : 'steady';
+      const sig = { intensity, trend, ratio, asOf: parseGdeltDate(dates[dates.length - 1]) };
+      _liveSignalCache[name] = { ts: Date.now(), sig };
+      return sig;
+    } catch {
+      return null;
+    }
+  }
+
+  function parseGdeltDate(s) {
+    // GDELT dates look like "20260606T120000Z" or "20260606000000"
+    const m = String(s).match(/^(\d{4})(\d{2})(\d{2})/);
+    if (!m) return 'today';
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${parseInt(m[3],10)} ${MONTHS[parseInt(m[2],10)-1]} ${m[1]}`;
+  }
+
+  function liveSignalLoadingHTML() {
+    return `<div class="ls-row"><span class="ls-live-dot"></span><span class="ls-label">Reading live signal…</span></div>`;
+  }
+
+  function liveSignalHTML(sig) {
+    if (!sig) {
+      return `<div class="ls-row"><span class="ls-live-dot ls-dim"></span><span class="ls-label ls-muted">Live signal unavailable right now — try again shortly</span></div>`;
+    }
+    const trendInfo = {
+      escalating: { arrow:'▲', cls:'ls-up',   word:'ESCALATING' },
+      steady:     { arrow:'▬', cls:'ls-flat', word:'STEADY' },
+      easing:     { arrow:'▼', cls:'ls-down', word:'EASING' },
+    }[sig.trend];
+    const intCls = { High:'ls-int-high', Elevated:'ls-int-elev', Moderate:'ls-int-mod', Low:'ls-int-low' }[sig.intensity];
+    return `
+      <div class="ls-row">
+        <span class="ls-live-dot"></span>
+        <span class="ls-label">LIVE · as of ${sig.asOf}</span>
+      </div>
+      <div class="ls-body">
+        <span class="ls-intensity ${intCls}">${sig.intensity.toUpperCase()} INTENSITY</span>
+        <span class="ls-trend ${trendInfo.cls}">${trendInfo.arrow} ${trendInfo.word}</span>
+      </div>
+      <div class="ls-note">Conflict-related news activity vs. the prior week · GDELT, refreshed every ~15 min</div>`;
+  }
+
+  function loadLiveSignal(name, elId, asOfElId) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = liveSignalLoadingHTML();
+    fetchLiveSignal(name).then(sig => {
+      const cur = document.getElementById(elId);
+      if (cur) cur.innerHTML = liveSignalHTML(sig);
+      if (asOfElId && sig) {
+        const a = document.getElementById(asOfElId);
+        if (a) a.textContent = sig.asOf;
+      }
+    });
   }
 
   // ── FETCH NEWS ────────────────────────────────────────────────
