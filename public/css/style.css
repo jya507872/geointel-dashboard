@@ -1718,6 +1718,21 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   position: relative;
 }
 
+/* ── ONGOING pill on active-situation cards ──────────────────── */
+.ec-ongoing {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: #ff4d4d;
+  border: 1px solid rgba(255,77,77,0.4);
+  background: rgba(255,77,77,0.12);
+  border-radius: 3px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+  animation: ls-pulse 2s infinite;
+}
+
 /* ── RESPONSIVE — TABLET ─────────────────────────────────────── */
 @media (max-width: 900px) {
   :root { --panel-w: 280px; }

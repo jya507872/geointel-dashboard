@@ -998,10 +998,30 @@ const App = (() => {
       const sourcesLive = [...new Set(items.map(i => i.source))].length;
       document.getElementById('stat-news').textContent = sourcesLive || '--';
       setSignal('SIGNAL LIVE', false);
+      renderWireList(items);
       setTickerItems(items);
     } catch {
       setSignal('SIGNAL LOST', true);
     }
+  }
+
+  // ── LIVE PRESS WIRE (dated list of vetted-source headlines) ───
+  function renderWireList(items) {
+    const el = document.getElementById('wire-list');
+    if (!el || !items.length) return;
+    el.innerHTML = items.slice(0, 14)
+      .map(i => newsItemHTML(i.title, i.source, i.date, i.link, i.tier))
+      .join('');
+    // Freshness stamp from the newest item
+    const badge = document.getElementById('wire-updated');
+    if (badge) {
+      const newest = items[0] && timeAgo(items[0].date);
+      badge.textContent = newest ? `${sourcesLive_count(items)} sources · ${newest}` : 'live';
+    }
+  }
+
+  function sourcesLive_count(items) {
+    return [...new Set(items.map(i => i.source))].length;
   }
 
   // ── SOCIAL MEDIA SCREENING (Reddit — Unverified) ───────────────
@@ -1111,8 +1131,8 @@ const App = (() => {
       card.innerHTML = `
         <div class="ec-stripe" style="background:${color}"></div>
         <div class="ec-body">
-          <div class="ec-name">${ev.name}</div>
-          <div class="ec-location">${ev.location} · ${ev.started||''}</div>
+          <div class="ec-name">${ev.name} <span class="ec-ongoing">● ONGOING</span></div>
+          <div class="ec-location">${ev.location}${ev.started ? ` · since ${ev.started}` : ''}</div>
           <div class="ec-info">${ev.info}</div>
         </div>
         <div class="ec-severity" style="color:${color}">

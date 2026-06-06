@@ -854,9 +854,16 @@ function getTagClass(tag) {
 }
 
 function timeAgo(dateStr) {
-  const d = new Date(dateStr);
+  let d = new Date(dateStr);
+  // GDELT uses a compact, non-ISO stamp ("20260606T101500Z" / "20260606101500")
+  // that native Date() can't parse — normalize it so intel items show a time.
+  if (isNaN(d) && typeof dateStr === 'string') {
+    const m = dateStr.match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})(\d{2})(\d{2})/);
+    if (m) d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+  }
   if (isNaN(d)) return '';
   const mins = Math.floor((Date.now() - d) / 60000);
+  if (mins < 1)  return 'just now';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
